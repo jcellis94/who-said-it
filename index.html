@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thanksgiving Things</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout idea: one phone-width column. Round label on top, the topic as the
+     single loud element on a cranberry card, two big buttons under it. */
+  :root {
+    --bg: #f4eef1;
+    --ink: #2a1620;
+    --muted: #6f5a64;
+    --card: #8e1f3f;
+    --card-ink: #fff6ea;
+    --gold: #e0a526;
+    --line: #dccfd5;
+    --font-display: "Bricolage Grotesque", "Trebuchet MS", "Segoe UI", sans-serif;
+    --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1c1117;
+      --ink: #f6eaef;
+      --muted: #b9a3ad;
+      --card: #a32a4d;
+      --card-ink: #fff6ea;
+      --gold: #f0bb45;
+      --line: #3a2731;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1c1117;
+    --ink: #f6eaef;
+    --muted: #b9a3ad;
+    --card: #a32a4d;
+    --card-ink: #fff6ea;
+    --gold: #f0bb45;
+    --line: #3a2731;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 24px 20px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 22px;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .round {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .round b { color: var(--ink); font-weight: 800; font-size: 20px; }
+
+  .card {
+    background: var(--card);
+    color: var(--card-ink);
+    border-radius: 22px;
+    padding: 30px 24px 34px;
+    min-height: 250px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border-bottom: 8px solid var(--gold);
+  }
+  .card .label {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--gold);
+  }
+  .topic {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(28px, 8.4vw, 40px);
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+    overflow-wrap: break-word;
+  }
+
+  .answers {
+    border: 2px solid var(--line);
+    border-radius: 16px;
+    padding: 16px 18px;
+  }
+  .answers h2 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 17px;
+    margin: 0 0 10px;
+  }
+  .answers ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .answers .hint { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
+  .answers li { display: flex; }
+  .answers li button {
+    font-family: var(--font-body);
+    font-size: 17px;
+    font-weight: 600;
+    text-align: left;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    padding: 9px 16px;
+    overflow-wrap: anywhere;
+  }
+  .answers li button[aria-pressed="true"] {
+    border-color: var(--line);
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-thickness: 2px;
+  }
+  .answers li button[aria-pressed="true"]::before {
+    content: "\2713\00a0";
+    display: inline-block;
+    text-decoration: none;
+    color: var(--gold);
+  }
+
+  .controls { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+  button {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 19px;
+    border-radius: 16px;
+    padding: 18px 12px;
+    cursor: pointer;
+    border: 2px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+  }
+  button.next { background: var(--ink); color: var(--bg); }
+  button:disabled { opacity: 0.35; cursor: default; }
+  button:focus-visible, input:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 3px;
+  }
+
+  .jump {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .jump input {
+    width: 76px;
+    font: inherit;
+    font-variant-numeric: tabular-nums;
+    padding: 9px 10px;
+    border-radius: 10px;
+    border: 2px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+  }
+  .jump button { font-size: 15px; padding: 10px 16px; border-radius: 10px; }
+
+  .scores {
+    border-top: 2px solid var(--line);
+    padding-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .scores h2 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 17px;
+    margin: 0;
+  }
+  .scores .note { margin: 0; color: var(--muted); font-size: 15px; }
+  #playerList { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  #playerList li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 2px solid var(--line);
+    border-left: 8px solid var(--line);
+    border-radius: 12px;
+  }
+  #playerList li.lead { border-left-color: var(--gold); }
+  .pname { font-weight: 600; overflow-wrap: anywhere; }
+  .pscore {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 24px;
+    font-variant-numeric: tabular-nums;
+    min-width: 2ch;
+    text-align: right;
+  }
+  .pbtns { display: flex; gap: 6px; }
+  .pbtns button {
+    font-size: 16px;
+    padding: 10px 0;
+    width: 46px;
+    border-radius: 10px;
+    font-variant-numeric: tabular-nums;
+  }
+  .pbtns button.plus { background: var(--ink); color: var(--bg); }
+  .addrow { display: flex; gap: 10px; }
+  .addrow input {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    padding: 11px 12px;
+    border-radius: 10px;
+    border: 2px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+  }
+  .addrow button, .resets button { font-size: 15px; padding: 10px 16px; border-radius: 10px; }
+  .resets { display: flex; gap: 10px; flex-wrap: wrap; }
+  .resets button { border-color: var(--line); color: var(--muted); font-weight: 600; }
+  .resets button.armed { border-color: var(--card); color: var(--card); }
+  :root[data-theme="dark"] .resets button.armed { border-color: var(--gold); color: var(--gold); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .resets button.armed { border-color: var(--gold); color: var(--gold); }
+  }
+
+  .syncrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: -8px; }
+  .syncrow button { font-size: 15px; padding: 8px 16px; border-radius: 10px; flex: none; }
+  .syncedAt { margin: 0; color: var(--muted); font-size: 14px; }
+  .answers .addrow { margin-top: 12px; }
+  .sync {
+    border-top: 2px solid var(--line);
+    padding-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sync h2 { font-family: var(--font-display); font-weight: 800; font-size: 17px; margin: 0; }
+  .sync p { margin: 0; color: var(--muted); font-size: 15px; }
+  .sync button { font-size: 17px; padding: 14px 12px; }
+  .sync button.armed { background: var(--card); border-color: var(--card); color: var(--card-ink); }
+
+  .how {
+    border-top: 2px solid var(--line);
+    padding-top: 18px;
+  }
+  .how h2 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 17px;
+    margin: 0 0 8px;
+  }
+  .how ol { margin: 0; padding-left: 22px; color: var(--muted); display: grid; gap: 6px; }
+  .how li::marker { font-weight: 600; color: var(--ink); }
+
+  /* Room-code version */
+  .panel {
+    border: 2px solid var(--line);
+    border-radius: 16px;
+    padding: 20px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel h2 { font-family: var(--font-display); font-weight: 800; font-size: 19px; margin: 0; }
+  .panel h2.gap { margin-top: 14px; padding-top: 18px; border-top: 2px solid var(--line); }
+  .panel p { margin: 0; color: var(--muted); font-size: 15px; }
+  .panel .msg { color: var(--ink); font-weight: 600; min-height: 1.5em; }
+  .panel #codeInput {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  button.wide { background: var(--ink); color: var(--bg); }
+  #game { display: flex; flex-direction: column; gap: 20px; }
+  #game[hidden] { display: none; }
+  .gamebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px 12px;
+    margin-top: -8px;
+  }
+  .codebox { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .codelabel { color: var(--muted); font-size: 14px; }
+  .codebox b {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 0.14em;
+    font-variant-numeric: tabular-nums;
+  }
+  .barbtns { display: flex; gap: 8px; }
+  .barbtns button { font-size: 15px; padding: 8px 14px; border-radius: 10px; }
+  .live, .invite { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+  .live::before {
+    content: "";
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    margin-right: 7px;
+    background: var(--line);
+  }
+  .live.on::before { background: var(--gold); }
+  .live.bad { color: var(--card); font-weight: 600; }
+  .answers .resets { margin-top: 12px; }
+  .pbtns button.remove { width: auto; padding: 10px 14px; border-color: var(--card); color: var(--card); }
+  :root[data-theme="dark"] .live.bad, :root[data-theme="dark"] .pbtns button.remove { color: var(--gold); border-color: var(--gold); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .live.bad,
+    :root:not([data-theme="light"]) .pbtns button.remove { color: var(--gold); border-color: var(--gold); }
+  }
+  .resets button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Thanksgiving Things</h1>
+    <div class="round" id="roundLabel" aria-live="polite" hidden>Round <b id="roundNum">1</b> of <span id="roundTotal">60</span></div>
+  </header>
+
+  <section class="panel" id="setup" hidden>
+    <h2>Almost ready</h2>
+    <p>This page is not connected to its database yet, so games cannot start. The person who set it up needs to finish that step.</p>
+  </section>
+
+  <section class="panel" id="lobby" hidden>
+    <h2>Join a game</h2>
+    <p>Type the six-character code from the person who started the game.</p>
+    <form class="addrow" id="joinForm">
+      <input id="codeInput" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Game code" aria-label="Game code">
+      <button type="submit" id="joinBtn">Join</button>
+    </form>
+    <h2 class="gap">Start a game</h2>
+    <p>You get a new code to share. Everyone with the code sees and changes the same game, live.</p>
+    <button type="button" class="wide" id="startBtn">Start a new game</button>
+    <p class="msg" id="lobbyMsg" aria-live="polite"></p>
+  </section>
+
+  <div id="game" hidden>
+    <section class="gamebar">
+      <div class="codebox">
+        <span class="codelabel">Game code</span>
+        <b id="codeLabel">------</b>
+      </div>
+      <div class="barbtns">
+        <button type="button" id="inviteBtn">Invite</button>
+        <button type="button" id="leaveBtn">Leave</button>
+      </div>
+      <p class="live" id="status" aria-live="polite">Connecting…</p>
+      <p class="invite" id="inviteLink" hidden></p>
+    </section>
+
+    <section class="card" aria-live="polite">
+      <div class="label">Everyone write an answer</div>
+      <p class="topic" id="topic"></p>
+    </section>
+
+    <section class="answers" id="answers">
+      <h2>Answers from this round <span id="answerCount"></span></h2>
+      <p class="hint">Tap an answer to mark it guessed. Tap again to undo. Every phone sees it.</p>
+      <ul id="answerList"></ul>
+      <form class="addrow" id="answerForm">
+        <input id="answerInput" type="text" maxlength="80" autocomplete="off" placeholder="Add an answer" aria-label="Add an answer">
+        <button type="submit" id="answerAddBtn">Add</button>
+      </form>
+      <div class="resets" id="answerResets" hidden>
+        <button type="button" id="clearAnswersBtn">Clear this round's answers</button>
+      </div>
+    </section>
+
+    <section class="answers" id="roster">
+      <h2>Players this round <span id="rosterCount"></span></h2>
+      <p class="hint" id="rosterHint">Tap a player when their answer is guessed. Everyone is back in on the next round.</p>
+      <ul id="rosterList"></ul>
+    </section>
+
+    <div class="controls">
+      <button type="button" id="prevBtn">Back</button>
+      <button type="button" class="next" id="nextBtn">Next round</button>
+    </div>
+
+    <form class="jump" id="jumpForm">
+      <label for="jumpInput">Go to round</label>
+      <input id="jumpInput" type="number" inputmode="numeric" min="1" max="60" value="1">
+      <button type="submit" id="jumpBtn">Go</button>
+    </form>
+
+    <section class="scores">
+      <h2>Players and scores</h2>
+      <p class="note">Add players in seat order. Anyone in the game can keep score.</p>
+      <ul id="playerList"></ul>
+      <form class="addrow" id="addForm">
+        <input id="nameInput" type="text" maxlength="24" autocomplete="off" placeholder="Player name" aria-label="Player name">
+        <button type="submit" id="addBtn">Add</button>
+      </form>
+      <div class="resets" id="resets" hidden>
+        <button type="button" id="editBtn" aria-pressed="false">Remove a player</button>
+        <button type="button" id="zeroBtn">Zero the scores</button>
+      </div>
+    </section>
+
+    <section class="how">
+      <h2>How to play</h2>
+      <ol>
+        <li>Everyone joins with the game code. Every phone shows the same round, answers and scores.</li>
+        <li>Pick a reader. Everyone, the reader included, secretly writes an answer on paper and hands it in.</li>
+        <li>The reader reads every answer aloud. The player on the reader's left guesses first by picking an answer and naming who wrote it.</li>
+        <li>A right guess scores 1 point, puts that writer out for the round, and earns another guess. A wrong guess passes the turn to the left.</li>
+        <li>The round ends when one writer is left unguessed. That player scores 2 points.</li>
+        <li>The player on the reader's left reads next. Play until everyone has been reader. The top score wins.</li>
+      </ol>
+    </section>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+
+  /* The one setting: the Firebase Realtime Database address. */
+  var DB_URL = String(window.THINGS_DB_URL || "__DB_URL__").replace(/\/+$/, "");
+  var CONFIGURED = /^https:\/\//.test(DB_URL);
+
+  var TOPICS = [
+    "Things you shouldn't say while carving the turkey.",
+    "Things you shouldn't teach a parrot to say.",
+    "Things that would make a terrible pie filling.",
+    "Things that would be worse if they were twice as big.",
+    "Things you'd rather do than wash the dishes tonight.",
+    "Things a dog thinks about all day.",
+    "Things the turkey was thinking this morning.",
+    "Things you'd find in a wizard's junk drawer.",
+    "Things you shouldn't bring to Thanksgiving dinner.",
+    "Things that should come with a warning label.",
+    "Things you're secretly thankful for.",
+    "Things you shouldn't do in an elevator.",
+    "Things that get said at the kids' table.",
+    "Things you'd buy first after winning the lottery.",
+    "Things you shouldn't do with leftover mashed potatoes.",
+    "Things that sound like a superpower but would be useless.",
+    "Things a pilgrim would find confusing about this dinner.",
+    "Things your phone would say about you.",
+    "Things you'd find under this couch.",
+    "Things you shouldn't yell in a library.",
+    "Things that could ruin a family photo.",
+    "Things that are harder than they look.",
+    "Things you shouldn't say when someone asks for the recipe.",
+    "Things you'd put in a time capsule.",
+    "Things that make you fall asleep after dinner.",
+    "Things a baby would say if babies could talk.",
+    "Things that would improve the Thanksgiving parade.",
+    "Things you shouldn't pack for a camping trip.",
+    "Things you shouldn't put gravy on.",
+    "Things that would make school more fun.",
+    "Things this family argues about every year.",
+    "Things you do when nobody is watching.",
+    "Things you pretend to like to be polite.",
+    "Things you'd ask a talking cat.",
+    "Things Grandma would never allow at the table.",
+    "Things that would be a bad name for a boat.",
+    "Things you'd say to get out of the long drive home.",
+    "Things you shouldn't say on your first day at a new job.",
+    "Things that should be a Thanksgiving tradition.",
+    "Things aliens would find strange about Earth.",
+    "Things you shouldn't whisper during a toast.",
+    "Things you'd never lend to a neighbor.",
+    "Things you'd hide the last slice of pie behind.",
+    "Things that make a road trip feel longer.",
+    "Things that happen when the adults leave the kitchen.",
+    "Things you shouldn't try on roller skates.",
+    "Things a football announcer would say about this dinner.",
+    "Things you'd rename if you were in charge.",
+    "Things you'd do with a fifty-pound turkey.",
+    "Things that belong in a museum about this family.",
+    "Things that smell better than they taste.",
+    "Things you wish came with an undo button.",
+    "Things you shouldn't say to the cook.",
+    "Things a snowman worries about.",
+    "Things you'd trade your dessert for.",
+    "Things you'd say to your ten-year-old self.",
+    "Things that always go missing during the holidays.",
+    "Things you shouldn't say to your dentist.",
+    "Things you'd name a brand-new side dish.",
+    "Things you'll remember about today."
+  ];
+
+  var ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  var CODE_RE = /^[A-Z2-9]{6}$/;
+  var CKEY = "things-live-code";
+  var total = TOPICS.length;
+  var code = null;      /* the game this phone is in */
+  var cache = {};       /* this phone's copy of the game */
+  var stream = null;
+  var editing = false;  /* scoreboard shows Remove buttons */
+
+  function $(id) { return document.getElementById(id); }
+  function obj(v) { return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
+
+  /* ---------- database ---------- */
+  function roomUrl(c, path) {
+    return DB_URL + "/rooms/" + c + (path ? "/" + path : "") + ".json";
+  }
+  function request(method, c, path, body) {
+    var opts = { method: method };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    return fetch(roomUrl(c, path), opts).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  }
+  function setAt(path, value) {
+    var parts = String(path).split("/").filter(Boolean);
+    for (var k = 0; k < parts.length; k++) {
+      if (parts[k] === "__proto__" || parts[k] === "constructor" || parts[k] === "prototype") return;
+    }
+    if (!parts.length) { cache = obj(value); return; }
+    var node = cache;
+    for (var i = 0; i < parts.length - 1; i++) {
+      if (!node[parts[i]] || typeof node[parts[i]] !== "object") node[parts[i]] = {};
+      node = node[parts[i]];
+    }
+    var leaf = parts[parts.length - 1];
+    if (value === null || value === undefined) delete node[leaf]; else node[leaf] = value;
+  }
+  /* JSON with sorted keys, so two copies of the same value compare equal. */
+  function canon(v) {
+    if (v === undefined) v = null;
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      return "{" + Object.keys(v).sort().map(function (k) {
+        return JSON.stringify(k) + ":" + canon(v[k]);
+      }).join(",") + "}";
+    }
+    if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
+    return JSON.stringify(v);
+  }
+
+  /* Changes this phone has sent that the database has not echoed back yet:
+     { path: [{ v: canonical JSON, t: time sent }] }. While a path has one,
+     older values arriving for it are skipped, so quick taps are never undone. */
+  var pending = {};
+  var sweepTimer = null;
+
+  function dropPending(path, json) {
+    var q = pending[path];
+    if (!q) return;
+    for (var i = 0; i < q.length; i++) {
+      if (q[i].v === json) { q.splice(i, 1); break; }
+    }
+    if (!q.length) delete pending[path];
+  }
+  function sweep() {
+    sweepTimer = null;
+    var now = Date.now(), stale = false, left = false;
+    Object.keys(pending).forEach(function (p) {
+      pending[p] = pending[p].filter(function (e) {
+        if (now - e.t > 5000) { stale = true; return false; }
+        return true;
+      });
+      if (pending[p].length) left = true; else delete pending[p];
+    });
+    if (stale) resync();
+    if (left) sweepTimer = setTimeout(sweep, 2000);
+  }
+  /* Fetch the whole game again and take it as the truth. */
+  function resync() {
+    if (!code) return;
+    var mine = code;
+    request("GET", mine, "").then(function (data) {
+      if (code !== mine) return;
+      incoming("", data);
+      render();
+    }, function () {});
+  }
+
+  /* Change this phone first, then tell the database, which tells everyone. */
+  function write(path, value) {
+    if (!code) return;
+    if (value === undefined) value = null;
+    setAt(path, value);
+    render();
+    var json = canon(value);
+    (pending[path] = pending[path] || []).push({ v: json, t: Date.now() });
+    if (!sweepTimer) sweepTimer = setTimeout(sweep, 2000);
+    request("PUT", code, path, value).catch(function () {
+      dropPending(path, json);
+      setStatus("Could not save that change. Check the connection.", "bad");
+      resync();
+    });
+  }
+
+  /* Take a value the database sent. */
+  function incoming(path, data) {
+    path = String(path).split("/").filter(Boolean).join("/");
+    var q = pending[path];
+    if (q && q.length) {
+      if (canon(data) === q[0].v) q.shift();
+      if (q.length) return;            /* a newer change from this phone is on its way */
+      delete pending[path];
+      setAt(path, data);
+      return;
+    }
+    setAt(path, data);
+    /* Changes this phone made underneath this path are newer: keep them. */
+    var prefix = path ? path + "/" : "";
+    Object.keys(pending).forEach(function (p) {
+      var pq = pending[p];
+      if (p !== path && p.indexOf(prefix) === 0 && pq.length) {
+        setAt(p, JSON.parse(pq[pq.length - 1].v));
+      }
+    });
+  }
+  function newId() {
+    var t = Date.now().toString(36);
+    while (t.length < 9) t = "0" + t;
+    return t + randomChars(6);
+  }
+  function randomChars(n) {
+    var out = "", buf = new Uint32Array(n);
+    try { crypto.getRandomValues(buf); } catch (e) {
+      for (var j = 0; j < n; j++) buf[j] = Math.floor(Math.random() * 4294967296);
+    }
+    for (var i = 0; i < n; i++) out += ALPHABET.charAt(buf[i] % ALPHABET.length);
+    return out;
+  }
+
+  function setStatus(text, kind) {
+    var el = $("status");
+    el.textContent = text;
+    el.className = "live" + (kind ? " " + kind : "");
+  }
+
+  function openStream() {
+    closeStream();
+    if (typeof EventSource !== "function") {
+      setStatus("This browser cannot receive live updates.", "bad");
+      return;
+    }
+    var mine = code;
+    stream = new EventSource(roomUrl(code, ""));
+    stream.onopen = function () { if (code === mine) setStatus("Live", "on"); };
+    stream.onerror = function () { if (code === mine) setStatus("Reconnecting…", ""); };
+    stream.addEventListener("put", function (e) {
+      if (code !== mine) return;
+      var d = JSON.parse(e.data);
+      incoming(d.path, d.data);
+      setStatus("Live", "on");
+      render();
+    });
+    stream.addEventListener("patch", function (e) {
+      if (code !== mine) return;
+      var d = JSON.parse(e.data), data = obj(d.data);
+      Object.keys(data).forEach(function (k) { incoming(d.path + "/" + k, data[k]); });
+      setStatus("Live", "on");
+      render();
+    });
+    stream.addEventListener("cancel", function () {
+      if (code === mine) setStatus("The database refused this game code.", "bad");
+    });
+  }
+  function closeStream() {
+    if (stream) { try { stream.close(); } catch (e) {} stream = null; }
+  }
+
+  /* ---------- lobby ---------- */
+  function showView(name) {
+    $("setup").hidden = name !== "setup";
+    $("lobby").hidden = name !== "lobby";
+    $("game").hidden = name !== "game";
+    $("roundLabel").hidden = name !== "game";
+  }
+  function lobbyMsg(t) { $("lobbyMsg").textContent = t; }
+
+  function enter(c, data) {
+    code = c;
+    cache = obj(data);
+    pending = {};
+    try { localStorage.setItem(CKEY, c); } catch (e) {}
+    try { history.replaceState(null, "", "#" + c); } catch (e) { location.hash = c; }
+    $("codeLabel").textContent = c;
+    $("inviteLink").hidden = true;
+    editing = false;
+    setStatus("Connecting…", "");
+    showView("game");
+    render();
+    openStream();
+  }
+  function leave() {
+    closeStream();
+    code = null;
+    cache = {};
+    pending = {};
+    try { localStorage.removeItem(CKEY); } catch (e) {}
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    lobbyMsg("");
+    showView("lobby");
+  }
+  function join(c, quiet) {
+    c = String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!CODE_RE.test(c)) {
+      if (!quiet) lobbyMsg("A game code has six letters and numbers.");
+      return;
+    }
+    lobbyMsg("Looking for game " + c + "…");
+    request("GET", c, "").then(function (data) {
+      if (data === null) {
+        try { localStorage.removeItem(CKEY); } catch (e) {}
+        lobbyMsg("No game has the code " + c + ". Check it and try again.");
+        return;
+      }
+      lobbyMsg("");
+      enter(c, data);
+    }, function () {
+      lobbyMsg("Could not reach the game. Check the connection and try again.");
+    });
+  }
+  function start(tries) {
+    var c = randomChars(6);
+    lobbyMsg("Starting a game…");
+    request("GET", c, "").then(function (data) {
+      if (data !== null) {
+        if (tries > 4) throw new Error("no free code");
+        return start(tries + 1);
+      }
+      var fresh = { created: Date.now(), round: 1 };
+      return request("PUT", c, "", fresh).then(function () {
+        lobbyMsg("");
+        enter(c, fresh);
+      });
+    }).catch(function () {
+      lobbyMsg("Could not start a game. Check the connection and try again.");
+    });
+  }
+
+  /* ---------- game ---------- */
+  function curRound() {
+    var n = parseInt(cache.round, 10);
+    return isNaN(n) ? 1 : Math.min(total, Math.max(1, n));
+  }
+  function sortedKeys(o) { return Object.keys(o).sort(); }
+
+  function chips(ul, items, onTap) {
+    ul.textContent = "";
+    items.forEach(function (it) {
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = it.text;
+      b.setAttribute("aria-pressed", it.on ? "true" : "false");
+      b.addEventListener("click", function () { onTap(it); });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
+  function render() {
+    if (!code) return;
+    var n = curRound();
+    $("topic").textContent = TOPICS[n - 1];
+    $("roundNum").textContent = String(n);
+    $("prevBtn").disabled = n <= 1;
+    $("nextBtn").disabled = n >= total;
+    if (document.activeElement !== $("jumpInput")) $("jumpInput").value = String(n);
+
+    /* answers */
+    var answers = obj(obj(cache.answers)["r" + n]);
+    var aItems = sortedKeys(answers).filter(function (id) {
+      return answers[id] && typeof answers[id].t === "string";
+    }).map(function (id) {
+      return { id: id, text: answers[id].t, on: answers[id].g === true };
+    });
+    var aLeft = aItems.filter(function (a) { return !a.on; }).length;
+    $("answerCount").textContent = aItems.length ? "(" + aLeft + " left)" : "";
+    $("answerResets").hidden = aItems.length === 0;
+    chips($("answerList"), aItems, function (it) {
+      write("answers/r" + n + "/" + it.id + "/g", !it.on);
+    });
+
+    /* players in this round */
+    var players = obj(cache.players);
+    var ids = sortedKeys(players).filter(function (id) {
+      return players[id] && typeof players[id].n === "string";
+    });
+    var out = obj(obj(cache.out)["r" + n]);
+    var pItems = ids.map(function (id) {
+      return { id: id, text: players[id].n, on: out[id] === true };
+    });
+    var pLeft = pItems.filter(function (p) { return !p.on; }).length;
+    $("rosterCount").textContent = pItems.length ? "(" + pLeft + " still in)" : "";
+    $("rosterHint").textContent = pItems.length
+      ? "Tap a player when their answer is guessed. Everyone is back in on the next round."
+      : "Add players under Players and scores, below.";
+    chips($("rosterList"), pItems, function (it) {
+      write("out/r" + n + "/" + it.id, it.on ? null : true);
+    });
+
+    /* scoreboard */
+    var top = 0;
+    ids.forEach(function (id) { var s = Number(players[id].s) || 0; if (s > top) top = s; });
+    var list = $("playerList");
+    list.textContent = "";
+    ids.forEach(function (id) {
+      var p = players[id], s = Number(p.s) || 0;
+      var li = document.createElement("li");
+      if (top > 0 && s === top) li.className = "lead";
+      var name = document.createElement("span");
+      name.className = "pname";
+      name.textContent = p.n;
+      var score = document.createElement("span");
+      score.className = "pscore";
+      score.textContent = String(s);
+      var btns = document.createElement("span");
+      btns.className = "pbtns";
+      if (editing) {
+        btns.appendChild(scoreBtn("Remove", "remove", "Remove " + p.n, function () {
+          write("players/" + id, null);
+        }));
+      } else {
+        btns.appendChild(scoreBtn("−1", "", "Take 1 point from " + p.n, function () {
+          write("players/" + id + "/s", Math.max(0, s - 1));
+        }));
+        btns.appendChild(scoreBtn("+1", "plus", "Give 1 point to " + p.n, function () {
+          write("players/" + id + "/s", s + 1);
+        }));
+        btns.appendChild(scoreBtn("+2", "plus", "Give 2 points to " + p.n, function () {
+          write("players/" + id + "/s", s + 2);
+        }));
+      }
+      li.appendChild(name);
+      li.appendChild(score);
+      li.appendChild(btns);
+      list.appendChild(li);
+    });
+    if (!ids.length) editing = false;
+    $("resets").hidden = ids.length === 0;
+    $("editBtn").setAttribute("aria-pressed", editing ? "true" : "false");
+    $("editBtn").textContent = editing ? "Done removing" : "Remove a player";
+  }
+
+  function scoreBtn(label, cls, aria, fn) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    if (cls) b.className = cls;
+    b.setAttribute("aria-label", aria);
+    b.addEventListener("click", fn);
+    return b;
+  }
+
+  /* Two taps for anything that wipes shared data. */
+  function twoTap(btn, label, action) {
+    var timer = null;
+    btn.addEventListener("click", function () {
+      if (btn.classList.contains("armed")) {
+        clearTimeout(timer);
+        btn.classList.remove("armed");
+        btn.textContent = label;
+        action();
+      } else {
+        btn.classList.add("armed");
+        btn.textContent = "Tap again to confirm";
+        timer = setTimeout(function () {
+          btn.classList.remove("armed");
+          btn.textContent = label;
+        }, 4000);
+      }
+    });
+  }
+
+  /* ---------- wiring ---------- */
+  $("roundTotal").textContent = String(total);
+  $("jumpInput").max = String(total);
+
+  $("joinForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    join($("codeInput").value, false);
+  });
+  $("startBtn").addEventListener("click", function () { start(0); });
+  $("leaveBtn").addEventListener("click", leave);
+
+  $("inviteBtn").addEventListener("click", function () {
+    var link = location.origin + location.pathname + "#" + code;
+    var box = $("inviteLink");
+    function showLink(note) {
+      box.textContent = note + " " + link;
+      box.hidden = false;
+    }
+    if (navigator.share) {
+      navigator.share({ title: "Thanksgiving Things", text: "Join our game with code " + code, url: link })
+        .catch(function () { showLink("Send this link:"); });
+    } else if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(function () { showLink("Link copied:"); },
+        function () { showLink("Send this link:"); });
+    } else {
+      showLink("Send this link:");
+    }
+  });
+
+  $("prevBtn").addEventListener("click", function () { var n = curRound(); if (n > 1) write("round", n - 1); });
+  $("nextBtn").addEventListener("click", function () { var n = curRound(); if (n < total) write("round", n + 1); });
+  $("jumpForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var n = parseInt($("jumpInput").value, 10);
+    if (!isNaN(n)) write("round", Math.min(total, Math.max(1, n)));
+    $("jumpInput").blur();
+  });
+
+  $("answerForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = $("answerInput").value.trim().slice(0, 80);
+    if (!v) return;
+    $("answerInput").value = "";
+    write("answers/r" + curRound() + "/" + newId(), { t: v, g: false });
+  });
+  twoTap($("clearAnswersBtn"), "Clear this round's answers", function () {
+    write("answers/r" + curRound(), null);
+  });
+
+  $("addForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var v = $("nameInput").value.trim().slice(0, 24);
+    if (!v) return;
+    $("nameInput").value = "";
+    write("players/" + newId(), { n: v, s: 0 });
+  });
+  $("editBtn").addEventListener("click", function () { editing = !editing; render(); });
+  twoTap($("zeroBtn"), "Zero the scores", function () {
+    var players = obj(cache.players);
+    Object.keys(players).forEach(function (id) {
+      if (players[id] && typeof players[id].n === "string") write("players/" + id + "/s", 0);
+    });
+  });
+
+  window.addEventListener("hashchange", function () {
+    var h = location.hash.replace(/^#/, "").toUpperCase();
+    if (CODE_RE.test(h) && h !== code) { closeStream(); code = null; showView("lobby"); join(h, true); }
+  });
+
+  /* ---------- start ---------- */
+  if (!CONFIGURED) {
+    showView("setup");
+  } else {
+    showView("lobby");
+    var wanted = location.hash.replace(/^#/, "").toUpperCase();
+    if (!CODE_RE.test(wanted)) {
+      try { wanted = localStorage.getItem(CKEY) || ""; } catch (e) { wanted = ""; }
+    }
+    if (CODE_RE.test(wanted)) { $("codeInput").value = wanted; join(wanted, true); }
+  }
+})();
+</script>
+</body>
+</html>
