@@ -424,9 +424,9 @@
    The game state comes only from the live listener (watchGame), never from
    the result of this phone's own write. */
 /* The version of the page and its scripts. Change it with every publish that
-   changes index.html, game.js, backend.js or topics.js. Phones compare it with
-   the copy on the site and reload themselves when it differs. */
-window.WSI_VERSION = "7";
+   changes index.html, game.js, backend.js or topics.js. Digits only. Phones
+   compare it with the copy on the site and reload themselves when it differs. */
+window.WSI_VERSION = "8";
 window.startWhoSaidIt = function (deps) {
   "use strict";
   var be = deps.backend, G = deps.game, T = deps.topics;
@@ -436,7 +436,6 @@ window.startWhoSaidIt = function (deps) {
   var userKnown = false;  // the first sign-in state has arrived
   var code = "";          // game this phone is in
   var s = null;           // that game's state
-  var prev = null;        // the state before the latest change, to spot events
   var stopGame = null, stopStats = null;
   var stats = null;       // { w, g } for a Google user
   var wasIn = false;      // this phone had a name in this game
@@ -448,7 +447,8 @@ window.startWhoSaidIt = function (deps) {
   var sending = false;    // a move is on its way
   var nextPick = null;    // host: the topic lined up for the next round
   var auto = { key: "", at: 0 };   // last move this phone made by itself
-  var credited = "";      // game already added to saved wins
+  var crediting = false;  // this finished game is being added to saved wins
+  var outWhy = "";        // why this phone was taken out: "vote" or "host"
   var toastTimer = 0, momentTimer = 0, wake = null;
   var coached = {};       // round-1 hints already shown
   var sound = true;
@@ -474,6 +474,8 @@ window.startWhoSaidIt = function (deps) {
   }
   function show(id, on) { $(id).hidden = !on; }
   function name(uid) { return s && s.players[uid] ? s.players[uid].n : "someone who left"; }
+  function cap(text) { return text.charAt(0).toUpperCase() + text.slice(1); }
+  function hostName() { return s && s.players[s.host] ? s.players[s.host].n : "the host"; }
   function list(names) {
     return names.length < 2 ? names.join("") : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
   }
@@ -513,7 +515,7 @@ window.startWhoSaidIt = function (deps) {
   function act(move, args, quiet) {
     if (!me || !code) return Promise.resolve();
     var uid = me.uid;
-    sending = true;
+    sending = true; render();
     return be.act(code, function (state) {
       return G[move](state, uid, args, Date.now());
     }).then(function () {
@@ -551,6 +553,7 @@ window.startWhoSaidIt = function (deps) {
       var Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
       audio = audio || new Ctx();
+      if (audio.state === "suspended" && audio.resume) audio.resume();
       var o = audio.createOscillator(), g = audio.createGain();
       o.type = "sine"; o.frequency.value = 660;
       g.gain.setValueAtTime(0.0001, audio.currentTime);
@@ -602,7 +605,7 @@ window.startWhoSaidIt = function (deps) {
         var text = now.answers[L.answer] || "", who = name(L.target), by = name(L.by);
         if (L.ok) {
           if (L.by === uid) more.unshift(ended ? "" : coach("right", "Right means you go again."));
-          else if (L.target !== uid) more.unshift(coach("caught", "Caught players sit out the guessing until next round."));
+          else if (L.target !== uid) more.unshift(coach("caught", "Caught players watch until the next round."));
           if (L.by === uid) moment("ok", "Yes!", "You caught " + who + ". +1." + (ended ? "" : " Go again."), more.filter(Boolean).join(" "));
           else if (L.target === uid) moment("no", "Caught!", by + " found your answer.", "You're out of the guessing this round.");
           else moment("ok", "Caught!", by + " caught " + who + ". " + quote(text), more.filter(Boolean).join(" "));
@@ -625,7 +628,7 @@ window.startWhoSaidIt = function (deps) {
     /* the phone it concerns gets a buzz */
     if (now.phase === "guess" && now.turn === uid && (old.turn !== uid || old.phase !== "guess")) buzz();
     if (now.phase === "write" && old.phase === "write" && now.round === old.round && now.topic !== old.topic) {
-      $("newTopic").textContent = "New topic! " + name(now.host) + " swapped it." + (old.answers[uid] !== undefined ? " Write a new answer." : "");
+      $("newTopic").textContent = "New topic! " + (now.players[now.host] ? now.players[now.host].n : "The host") + " swapped it." + (old.answers[uid] !== undefined ? " Write a new answer." : "");
       show("newTopic", true); editing = false; peeking = false;
     }
     if (now.round !== old.round) { show("newTopic", false); editing = false; peeking = false; nextPick = null; show("ownTopicForm", false); }
@@ -652,25 +655,36 @@ window.startWhoSaidIt = function (deps) {
       if (!g) { $("homeMsg").textContent = "Can't find game " + c + ". Check the code with your host."; return; }
       if (!usable(g)) { $("homeMsg").textContent = "That game has ended."; return; }
       if (stopGame) stopGame();
-      code = c; s = g; prev = null; picked = ""; target = ""; editing = false; rejoining = false; coached = {};
+      code = c; s = g; picked = ""; target = ""; editing = false; rejoining = false; coached = {}; outWhy = ""; crediting = false;
       wasIn = amIn();
       try { history.replaceState(null, "", "#" + c); } catch (e) { location.hash = c; }
       try { localStorage.setItem("wsi-code", c); } catch (e) {}
-      stopGame = be.watchGame(c, function (data) {
-        if (!usable(data)) { leave(); $("homeMsg").textContent = "That game has ended."; return; }
-        var old = s;
-        s = data;
-        if (amIn()) { wasIn = true; rejoining = false; }
-        announce(old, s);
-        render();
-      }, function () { toast("Lost the connection. Trying again…"); });
+      listen(c);
       stayAwake();
       render();
     }).catch(function (e) { $("homeMsg").textContent = explain(e); });
   }
+  /* Firestore ends a listener when it reports an error, so start a new one. */
+  function listen(c) {
+    if (stopGame) stopGame();
+    stopGame = be.watchGame(c, function (data) {
+      if (code !== c) return;
+      if (!usable(data)) { leave(); $("homeMsg").textContent = "That game has ended."; return; }
+      var old = s, had = amIn();
+      s = data;
+      if (amIn()) { wasIn = true; rejoining = false; outWhy = ""; }
+      else if (had) outWhy = s.last && s.last.kind === "host" && s.seq !== old.seq ? "vote" : "host";
+      announce(old, s);
+      render();
+    }, function () {
+      if (code !== c) return;
+      toast("Lost the connection. Trying again…");
+      setTimeout(function () { if (code === c) listen(c); }, 3000);
+    });
+  }
   function leave() {
     if (stopGame) { stopGame(); stopGame = null; }
-    code = ""; s = null; picked = ""; target = ""; editing = false; wasIn = false;
+    code = ""; s = null; picked = ""; target = ""; editing = false; wasIn = false; outWhy = ""; crediting = false;
     closeSheets();
     try { if (wake) wake.release(); } catch (e) {}
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; }
@@ -757,7 +771,10 @@ window.startWhoSaidIt = function (deps) {
   function freshTopic() { return T.pickTopic(s.pack, s.used); }
   $("startGameBtn").onclick = function () { quietly(act("startRound", freshTopic())); };
   $("nextBtn").onclick = function () { quietly(act("startRound", nextPick || freshTopic())); };
-  $("swapBtn").onclick = function () { nextPick = freshTopic(); render(); };
+  $("swapBtn").onclick = function () {
+    nextPick = T.pickTopic(s.pack, nextPick && nextPick.index >= 0 ? s.used.concat([nextPick.index]) : s.used);
+    render();
+  };
   $("ownBtn").onclick = function () { show("ownTopicForm", true); $("ownTopicInput").focus(); };
   $("ownTopicForm").onsubmit = function (ev) {
     ev.preventDefault();
@@ -799,9 +816,10 @@ window.startWhoSaidIt = function (deps) {
     quietly(act("guess", args));
   };
   $("passBtn").onclick = function () {
-    ask("Pass your turn?", "Pass", "Keep guessing").then(function (yes) { if (yes) quietly(act("pass")); });
+    var turn = s.turn;
+    ask("Pass your turn?", "Pass", "Keep guessing").then(function (yes) { if (yes) quietly(act("pass", { turn: turn })); });
   };
-  $("unstickG").onclick = function () { quietly(act("pass")); };
+  $("unstickG").onclick = function () { quietly(act("pass", { turn: s.turn })); };
 
   /* ---------- menu ---------- */
   var PANELS = ["menuMain", "menuInvite", "menuHow", "menuScores", "menuRemove", "menuTopic"];
@@ -827,15 +845,15 @@ window.startWhoSaidIt = function (deps) {
   /* Any player but the host: vote for a new host, or take the vote back. */
   function voteNew() {
     show("menuVeil", false);
-    if (s.votes.indexOf(me.uid) >= 0) { quietly(act("voteHost")); return; }
+    if (s.votes.indexOf(me.uid) >= 0) { quietly(act("voteHost", { on: false })); return; }
     var need = G.votesNeeded(s), heir = G.seats(s).filter(function (id) { return id !== s.host; })[0];
-    ask("Vote for a new host? It takes " + need + (need === 1 ? " vote. " : " votes. ") + name(s.host) + " would be taken out of the game and " +
+    ask("Vote for a new host? It takes " + need + (need === 1 ? " vote. " : " votes. ") + hostName() + " would be taken out of the game and " +
       (heir === me.uid ? "you" : name(heir)) + " would become host.", "Vote", "Never mind").then(function (yes) {
-      if (yes) quietly(act("voteHost"));
+      if (yes) quietly(act("voteHost", { on: true }));
     });
   }
   $("mVote").onclick = voteNew; $("voteDone").onclick = voteNew; $("voteLobby").onclick = voteNew;
-  $("hSkip").onclick = function () { show("menuVeil", false); quietly(act("pass")); };
+  $("hSkip").onclick = function () { show("menuVeil", false); quietly(act("pass", { turn: s.turn })); };
   $("hGo").onclick = function () { show("menuVeil", false); startWithout(); };
   $("hTopic").onclick = function () { panel("menuTopic"); };
   $("tRandom").onclick = function () { show("menuVeil", false); quietly(act("changeTopic", freshTopic())); };
@@ -862,7 +880,11 @@ window.startWhoSaidIt = function (deps) {
     if (!amIn() || sending) return;
     if (s.phase === "write" && s.inRound.length && !missing().length) {
       once("allin" + s.round, 4000, function () { return act("allIn", null, true); });
+    } else if (s.votes.indexOf(me.uid) >= 0 && s.votes.length >= G.votesNeeded(s)) {
+      /* players leaving made the votes enough: a voter's phone completes it */
+      once("votes" + s.seq, 4000, function () { return act("voteHost", { on: true }, true); });
     }
+    if (s.phase === "over") creditMe();   // again here, in case the first try failed
     /* the safety-net buttons appear without anything else changing */
     if ((s.phase === "write" || s.phase === "guess") && stalled() !== tick.wasStalled) { tick.wasStalled = stalled(); render(); }
   }
@@ -894,7 +916,7 @@ window.startWhoSaidIt = function (deps) {
     $("lobbyHow").textContent = "Scan this, or type the code at " + location.host + ".";
     if (host && $("lobbyQr").dataset.code !== code) { $("lobbyQr").dataset.code = code; drawQr("lobbyQr"); }
     $("youreIn").textContent = "You're in, " + name(me.uid) + ".";
-    $("lobbyWait").textContent = "Waiting for " + name(s.host) + " to start.";
+    $("lobbyWait").textContent = "Waiting for " + hostName() + " to start.";
     $("lobbyCount").textContent = "In so far (" + n + ")";
     var box = $("lobbyList"); box.textContent = "";
     G.seats(s).forEach(function (id) { box.appendChild(person(id)); });
@@ -1016,9 +1038,9 @@ window.startWhoSaidIt = function (deps) {
       if (!nextPick) nextPick = freshTopic();
       $("nextTopic").textContent = nextPick.topic;
       $("nextBtn").textContent = "Start round " + (s.round + 1);
-      $("nextBtn").disabled = sending;
+      $("nextBtn").disabled = sending || Object.keys(s.players).length < G.RULES.MIN_PLAYERS;
     }
-    $("doneWait").textContent = "Waiting for " + name(s.host) + " to start round " + (s.round + 1) + ".";
+    $("doneWait").textContent = "Waiting for " + hostName() + " to start round " + (s.round + 1) + ".";
 
     var gains = $("gainList"), any = false; gains.textContent = "";
     G.seats(s).forEach(function (id) {
@@ -1046,16 +1068,20 @@ window.startWhoSaidIt = function (deps) {
     var w = s.winners, mine = w.length === 1 && w[0] === me.uid;
     $("winnerLine").textContent = !w.length ? "Game over" : mine ? "You win, " + name(me.uid) + "!" :
       list(w.map(name)) + (w.length === 1 ? " wins!" : " win!");
-    $("overLine").textContent = s.note === "host" ? name(s.host) + " called it. Here's how it finished." : "First to " + s.target + ".";
+    $("overLine").textContent = s.note === "host" ? cap(hostName()) + " called it. Here's how it finished." : "First to " + s.target + ".";
     show("againBtn", isHost()); show("againWait", !isHost());
-    $("againWait").textContent = "Waiting for " + name(s.host) + " to start a new game.";
+    $("againWait").textContent = "Waiting for " + hostName() + " to start a new game.";
     show("myStats", !!(me.google && stats));
     if (me.google && stats) $("myStats").textContent = "You've won " + stats.w + " of " + stats.g + " games.";
-    var key = code + ":" + (s.created && s.created.seconds) + ":" + s.round;
-    if (me.google && amIn() && s.credited.indexOf(me.uid) < 0 && credited !== key) {
-      credited = key;
-      be.creditGame(code).catch(function () { credited = ""; });
-    }
+    creditMe();
+  }
+
+  /* Add a finished game to a Google player's saved wins, once. The game keeps
+     the list of who has been counted; this only avoids asking twice at once. */
+  function creditMe() {
+    if (crediting || !s || s.phase !== "over" || !me.google || !amIn() || s.credited.indexOf(me.uid) >= 0) return;
+    crediting = true;
+    be.creditGame(code).then(function () { crediting = false; }, function () { crediting = false; });
   }
 
   function drawVote() {
@@ -1065,7 +1091,7 @@ window.startWhoSaidIt = function (deps) {
     show("mVote", can); $("mVote").textContent = label;
     show("voteLine", !can && n > 0);
     $("voteLine").textContent = n + " of " + need + " votes for a new host.";
-    var nudge = mine ? label : name(s.host) + " not here? " + label;
+    var nudge = mine ? label : cap(hostName()) + " not here? " + label;
     show("voteDone", can && s.phase === "done"); $("voteDone").textContent = nudge;
     show("voteLobby", can && s.phase === "lobby"); $("voteLobby").textContent = nudge;
   }
@@ -1133,8 +1159,8 @@ window.startWhoSaidIt = function (deps) {
     show("done", joined && (p === "done" || p === "over"));
     if (p !== "guess") show("pickVeil", false);
     if (out) {
-      var voted = s.last && s.last.kind === "host";
-      $("removedLine").textContent = (voted ? "The players voted for a new host." : name(s.host) + " took you out.") + " If that was a mistake, hop back in.";
+      $("removedLine").textContent = (outWhy === "vote" ? "The players voted for a new host." : outWhy === "host" ? cap(hostName()) + " took you out." : "You were taken out of this game.") +
+        " If that was a mistake, hop back in.";
       closeSheets(); return;
     }
     if (!joined) {
@@ -1159,18 +1185,22 @@ window.startWhoSaidIt = function (deps) {
      this phone would send moves the game no longer accepts ("This phone can't
      do that"), so it reloads itself; the game and the seat are on the server. */
   var stale = false;
-  function typing() {
-    var a = document.activeElement;
-    return !!a && (a.tagName === "INPUT") && a.value !== "";
+  /* Not a moment to reload: something typed and not sent, a panel open, or a move on its way. */
+  function busy() {
+    var typed = ["codeInput", "nameInput", "answerInput", "ownTopicInput", "tOwnInput"].some(function (id) {
+      return $(id).value !== "" && $(id).offsetParent !== null;
+    });
+    var open = ["menuVeil", "pickVeil", "askVeil"].some(function (id) { return !$(id).hidden; });
+    return typed || open || sending || navigator.onLine === false;
   }
   function checkVersion() {
-    if (stale) { if (!typing()) location.reload(); return; }
+    if (stale) { if (!busy()) location.reload(); return; }
     if (!window.fetch || document.visibilityState === "hidden") return;
     fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (html) {
       var m = /WSI_VERSION = "(\d+)"/.exec(html);
       if (!m || m[1] === window.WSI_VERSION) return;
       stale = true;
-      if (typing()) toast("A newer version of the game is ready. It will load when you've sent this.");
+      if (busy()) toast("A newer version of the game is ready. It will load in a moment.");
       else location.reload();
     }).catch(function () {});
   }

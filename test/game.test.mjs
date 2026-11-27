@@ -23,7 +23,7 @@ const says = (fn, re) => assert.throws(fn, e => e instanceof G.GameError && re.t
 test("joining: a name is required, unique, and seats follow join order", () => {
   const s = table(["Ann", "Bob", "Cy"]);
   assert.deepEqual(G.seats(s), ["h", "bob", "cy"]);
-  says(() => G.join(s, "x", { name: "  " }, 1), /name first/);
+  says(() => G.join(s, "x", { name: "  " }, 1), /^Type a name first\.$/);
   says(() => G.join(s, "x", { name: "bob" }, 1), /already Bob/);
   assert.equal(G.join(s, "bob", { name: "Robert" }, 999).players.bob.n, "Robert");
   assert.equal(G.join(s, "bob", { name: "Robert" }, 999).players.bob.j, 101);
@@ -160,6 +160,8 @@ test("passing: the guesser, the host, or anyone after two quiet minutes", () => 
   assert.equal(own.log.length, 1, "a pass is not a guess");
   assert.equal(G.pass(s, "h", null, 5001).last.target, "h");
   assert.equal(G.pass(s, "cy", null, 5000 + STALL).turn, "cy");
+  says(() => G.pass(own, "h", { turn: "bob" }, 5002), /already over/);
+  assert.equal(G.pass(own, "h", { turn: "cy" }, 5002).turn, "h", "a pass that names the current turn goes through");
 });
 
 test("round end: the last one hiding scores 2, and the next round waits for the host", () => {
@@ -169,7 +171,7 @@ test("round end: the last one hiding scores 2, and the next round waits for the 
   assert.equal(s.phase, "done");
   assert.equal(s.players.h.s, 4); assert.equal(s.base.h, 0);
   assert.deepEqual(G.authors(s), { h: "h", bob: "bob", cy: "cy" });
-  says(() => G.startRound(s, "bob", { topic: "T" }, 4000 + 10 * 60000), /Only the host/, "no clock ever lets a player start the round");
+  says(() => G.startRound(s, "bob", { topic: "T" }, 4000 + 10 * 60000), /Only the host/);   // no clock ever lets a player start the round
   says(() => G.startRound(s, "bob", { topic: "T", clock: true, deadline: 0 }, 4000 + 10 * 60000), /Only the host/);
   const next = G.startRound(s, "h", { topic: "T2" }, 9000);
   assert.equal(next.round, 2); assert.equal(next.phase, "write");
@@ -240,6 +242,23 @@ test("taking a voter out drops their vote", () => {
   assert.deepEqual(s.votes, ["dee"]);
 });
 
+test("a vote says which way it goes, so a late tap cannot flip it", () => {
+  let s = table(["Ann", "Bob", "Cy", "Dee", "Eve"]);
+  s = G.voteHost(s, "cy", { on: true }, 1);
+  assert.deepEqual(G.voteHost(s, "cy", { on: true }, 1).votes, ["cy"], "voting twice is one vote");
+  assert.deepEqual(G.voteHost(s, "dee", { on: false }, 1).votes, ["cy"], "taking back a vote you do not have does nothing");
+  assert.deepEqual(G.voteHost(s, "cy", { on: false }, 1).votes, []);
+});
+
+test("when players leaving makes the votes enough, a voter asking again completes it", () => {
+  let s = table(["Ann", "Bob", "Cy", "Dee", "Eve"]);
+  s = G.voteHost(G.voteHost(s, "cy", null, 1), "dee", null, 1);
+  s = G.remove(G.remove(s, "h", { player: "bob" }, 1), "h", { player: "eve" }, 1);
+  assert.equal(G.votesNeeded(s), 2); assert.equal(s.host, "h"); assert.deepEqual(s.votes, ["cy", "dee"]);
+  s = G.voteHost(s, "dee", { on: true }, 2);
+  assert.equal(s.host, "cy"); assert.deepEqual(s.votes, []);
+});
+
 test("identical answers count for either writer", () => {
   let s = writing(["Ann", "Bob", "Cy"]);
   s = G.submit(s, "h", { text: "a" }, 1);
@@ -285,6 +304,29 @@ test("winning: level leaders at the target play another round", () => {
   t.players.h.s = 2; t.players.bob.s = 6;
   t = G.guess(G.guess(t, "h", { answer: "bob", target: "bob" }, 1), "h", { answer: "cy", target: "cy" }, 1);
   assert.equal(t.phase, "done"); assert.equal(t.note, "tie");
+  const settled = G.remove(t, "h", { player: "bob" }, 2);
+  assert.equal(settled.phase, "over", "taking out one of the tied leaders leaves a winner");
+  assert.deepEqual(settled.winners, ["h"]);
+  const still = G.remove(t, "h", { player: "cy" }, 2);
+  assert.equal(still.phase, "done"); assert.equal(still.note, "tie");
+});
+
+test("second chances count trips of the players still hiding", () => {
+  let s = guessing(["Ann", "Bob", "Cy", "Dee", "Eve", "Fay"]);
+  for (const id of ["bob", "cy", "dee"]) s = G.guess(s, "h", { answer: id, target: id }, 1);
+  assert.deepEqual(s.alive, ["h", "eve", "fay"]); assert.equal(s.tripLeft, 3);
+  for (let i = 0; i < 5; i++) { s = G.pass(s, s.turn, null, 1); assert.equal(s.allowed, 1); }
+  s = G.pass(s, s.turn, null, 1);
+  assert.equal(s.trips, 2); assert.equal(s.allowed, 2, "two trips of the three still hiding, six turns");
+});
+
+test("the guess list keeps every catch when it is full", () => {
+  let s = guessing(["Ann", "Bob", "Cy", "Dee"]);
+  s = G.guess(s, "h", { answer: "bob", target: "bob" }, 1);
+  const wrong = { h: { answer: "cy", target: "dee" }, cy: { answer: "dee", target: "h" }, dee: { answer: "h", target: "cy" } };
+  for (let i = 0; i < 60; i++) s = G.guess(s, s.turn, wrong[s.turn], 1);
+  assert.equal(s.log.length, G.RULES.LOG_MAX);
+  assert.deepEqual(s.log.filter(e => e.ok), [{ kind: "guess", by: "h", answer: "bob", target: "bob", ok: true }]);
 });
 
 test("taking someone out: host only, never the host; scores and seat go", () => {
@@ -324,6 +366,7 @@ test("ending: the host can end early; play again keeps players and zeroes scores
   says(() => G.finish(s, "bob"), /Only the host/);
   s = G.finish(s, "h");
   assert.equal(s.phase, "over"); assert.deepEqual(s.winners, ["h"]); assert.equal(s.note, "host");
+  assert.deepEqual(G.finish(guessing(["Ann", "Bob", "Cy"]), "h").winners, [], "ending a game nobody has scored in has no winner");
   s.credited = ["h"];
   says(() => G.playAgain(s, "cy"), /Only the host/);
   const again = G.playAgain(s, "h");

@@ -3,7 +3,9 @@
    Every move is a function (state, uid, args, now) that returns the next state
    or throws a GameError whose message can be shown to the player. backend.js
    runs a move inside a Firestore transaction, so two phones cannot both apply
-   a move to the same state. test/game.test.mjs tests this file on its own.
+   a move to the same state. Two moves are the exception: the page uses join
+   and submit only to check a name or an answer against its own copy of the
+   game, then writes that one field without a transaction. test/game.test.mjs tests this file on its own.
 
    A round goes: write (everyone sends one secret answer), guess (all the
    answers appear on every phone at once and players take turns), done. A
@@ -85,7 +87,13 @@ function happened(s, event) {
   s.last = event;
   if (event && event.kind === "guess") {
     s.log.push(event);
-    if (s.log.length > RULES.LOG_MAX) s.log = s.log.slice(-RULES.LOG_MAX);
+    if (s.log.length > RULES.LOG_MAX) {
+      /* Drop the oldest miss: catches stay, because the page reads who
+         caught whom from this list. There are never more than 20 catches. */
+      var drop = 0;
+      for (var i = 0; i < s.log.length; i++) if (!s.log[i].ok) { drop = i; break; }
+      s.log.splice(drop, 1);
+    }
   }
 }
 
@@ -133,7 +141,7 @@ export function newGame(hostUid, options) {
 export function join(s, uid, args, now) {
   s = clone(s);
   var name = clean(args && args.name, RULES.NAME_MAX);
-  if (!name) fail("Type a character name first.");
+  if (!name) fail("Type a name first.");
   Object.keys(s.players).forEach(function (id) {
     if (id !== uid && same(s.players[id].n, name)) fail("Someone is already " + s.players[id].n + ". Pick another name.");
   });
@@ -202,15 +210,22 @@ function shuffled(list, rand) {
   return a;
 }
 
-function endRound(s, now) {
-  s.phase = "done";
-  s.turn = ""; s.misses = 0;
-  s.since = now;
+/* Between rounds: is there a winner? One clear leader at the target wins;
+   level leaders at the target play another round. */
+function settle(s) {
   var top = leaders(s);
+  if (s.note === "tie") s.note = "";
   if (top.length && s.players[top[0]].s >= s.target) {
     if (top.length === 1) { s.phase = "over"; s.winners = top; }
     else s.note = "tie";
   }
+}
+
+function endRound(s, now) {
+  s.phase = "done";
+  s.turn = ""; s.misses = 0;
+  s.since = now;
+  settle(s);
 }
 
 /* Writing is over: show the answers and start the guessing. */
@@ -282,6 +297,10 @@ function passTurn(s, now) {
 }
 
 function knockOut(s, id, now) {
+  /* A trip is over when everyone still hiding has had a turn. If this player
+     had not had theirs yet this trip, the trip is one turn shorter. */
+  var n = s.alive.length, ahead = (s.alive.indexOf(id) - s.alive.indexOf(s.turn) + n) % n;
+  if (ahead < s.tripLeft) s.tripLeft -= 1;
   s.alive = s.alive.filter(function (x) { return x !== id; });
   if (s.alive.length === 1) {
     s.players[s.alive[0]].s += RULES.BONUS;
@@ -317,6 +336,9 @@ export function guess(s, uid, args, now) {
    may once the game has been quiet for STALL_MS. */
 export function pass(s, uid, args, now) {
   if (s.phase !== "guess") fail("Nobody is guessing right now.");
+  /* The page says whose turn it means to pass, so a tap that arrives after
+     the turn has changed does not skip the next player. */
+  if (args && args.turn && args.turn !== s.turn) fail("That turn is already over.");
   if (uid !== s.turn) hostOrStalled(s, uid, now, "pass someone else's turn");
   s = clone(s);
   happened(s, { kind: "pass", by: s.turn, answer: "", target: uid, ok: false });
@@ -345,6 +367,8 @@ function takeOut(s, id, now, rand, quiet) {
   } else {
     /* between rounds: every list of player ids must still name real players */
     s.alive = s.alive.filter(function (x) { return x !== id; });
+    /* a tie at the target may have just been settled by this player going */
+    if (s.phase === "done") settle(s);
   }
   return name;
 }
@@ -368,16 +392,20 @@ export function votesNeeded(s) {
 
 /* A player votes for a new host, or takes the vote back. With enough votes
    the host is taken out of the game and the longest-seated other player
-   becomes host. */
+   becomes host. The page says which it wants (args.on), so a late tap cannot
+   flip a vote the other way. A voter asking again once the count is reached
+   (it can be reached by players leaving) completes the change. */
 export function voteHost(s, uid, args, now, rand) {
   if (!s.players[uid]) fail("You are not in this game.");
   if (uid === s.host) fail("You are the host.");
   s = clone(s);
-  if (s.votes.indexOf(uid) >= 0) {
+  var has = s.votes.indexOf(uid) >= 0;
+  var want = args && typeof args.on === "boolean" ? args.on : !has;
+  if (!want) {
     s.votes = s.votes.filter(function (x) { return x !== uid; });
     return s;
   }
-  s.votes.push(uid);
+  if (!has) s.votes.push(uid);
   if (s.votes.length < votesNeeded(s)) return s;
   var old = s.host, oldName = s.players[old] ? s.players[old].n : "The host";
   s.host = seats(s).filter(function (id) { return id !== old; })[0];
@@ -392,7 +420,9 @@ export function finish(s, uid) {
   if (s.phase === "lobby" || s.phase === "over") fail("There is no game to end.");
   s = clone(s);
   s.phase = "over"; s.turn = ""; s.note = "host";
-  s.winners = leaders(s);
+  /* Whoever is ahead wins; with no points scored, nobody does. */
+  var top = leaders(s);
+  s.winners = top.length && s.players[top[0]].s > 0 ? top : [];
   return s;
 }
 

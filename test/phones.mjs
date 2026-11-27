@@ -57,7 +57,7 @@ function phone(hash, googleSub) {
   const h = backend(googleSub || "unused" + apps);
   const dom = new JSDOM(html, {
     runScripts: "dangerously", url: "https://host.example/" + (hash || ""),
-    beforeParse(w) { w.WSI_DEPS = { backend: h.be, game, topics }; w.confirm = () => true; }
+    beforeParse(w) { w.WSI_DEPS = { backend: h.be, game, topics }; }
   });
   return { w: dom.window, d: dom.window.document, h };
 }
@@ -77,7 +77,6 @@ async function yes(p) { await until(() => vis(p, "askYes")); click(p, "askYes");
 async function guess(p, answerText, who) {
   const a = () => answers(p).find(b => own(b) === answerText);
   if (!await until(() => a() && !a().disabled && text(p, "turnHead").startsWith("Your turn"))) throw new Error("cannot tap answer " + answerText);
-  await until(() => !vis(p, "moment") || true);
   a().click();
   const w = () => [...p.d.querySelectorAll("#pickNames button")].find(b => b.textContent === who);
   if (!await until(() => vis(p, "pickStep") && w())) throw new Error("cannot tap name " + who);
@@ -210,7 +209,7 @@ try {
   check("a right guess is a moment worded for each viewer",
     /Yes!You caught Bob\. \+1\. Go again\./.test(mom(A)) && /Caught!Ann found your answer\./.test(mom(B)) && /Caught!Ann caught Bob\. “<i>the dog<\/i>”/.test(mom(C)),
     mom(A) + " | " + mom(B) + " | " + mom(C));
-  check("round 1 explains itself once", /Right means you go again\./.test(mom(A)) && /Caught players sit out/.test(mom(C)));
+  check("round 1 explains itself once", /Right means you go again\./.test(mom(A)) && /Caught players watch until the next round\./.test(mom(C)));
   await all([A, B, C, D], p => /^Ann=1, /.test(scores(p)));
   check("a right guess scores a point on every phone", [A, B, C, D].every(p => /^Ann=1, Bob=0/.test(scores(p))), scores(D));
   check("the caught player is told so and listed as caught",
@@ -246,10 +245,11 @@ try {
   check("only the host lines up the next topic and starts the round", vis(A, "nextBtn") && text(A, "nextBtn") === "Start round 2" && !vis(B, "nextBtn") && text(B, "doneWait") === "Waiting for Ann to start round 2.");
   check("the next round waits for the host; a player who is waiting can vote for a new one", !/by itself/.test(el(B, "done").textContent) && vis(B, "voteDone") && text(B, "voteDone") === "Ann not here? Vote for a new host" && !vis(A, "voteDone"), text(B, "voteDone"));
 
-  // ----- round 2: start without stragglers, hand the reading on, pass, the safety nets -----
+  // ----- round 2: start without stragglers, pass, the safety nets -----
   const lined = text(A, "nextTopic");
   click(A, "swapBtn");
-  check("the host can swap the next topic before anyone has written", text(A, "nextTopic") !== "" && topics.PACKS.general.topics.includes(lined));
+  check("the host can swap the next topic for a different one before anyone has written",
+    text(A, "nextTopic") !== lined && topics.PACKS.general.topics.includes(text(A, "nextTopic")) && text(A, "nextTopic") !== topic1, lined + " -> " + text(A, "nextTopic"));
   const topic2 = text(A, "nextTopic");
   click(A, "nextBtn");
   await all([A, B, C, D], p => vis(p, "write") && text(p, "barLabel") === "Round 2");
@@ -274,7 +274,6 @@ try {
   check("the first guesser rotates: round 2 starts with the second player; players who did not answer watch",
     text(B, "turnHead") === "Your turn, Bob" && answers(D).length === 2 && text(C, "stateBanner") === "You're watching this round.", text(B, "turnHead") + " " + text(C, "stateBanner"));
 
-  await until(() => !vis(B, "moment") || true);
   click(B, "passBtn");
   await until(() => vis(B, "askVeil"));
   check("passing your own turn asks first", text(B, "askText") === "Pass your turn?" && text(B, "askYes") === "Pass");
@@ -377,6 +376,24 @@ try {
   check("the old host is out and told why", vis(A, "removed") && text(A, "removedLine") === "The players voted for a new host. If that was a mistake, hop back in.", text(A, "removedLine"));
   check("the vote starts again from nothing", text(C, "mVote") === "Vote for a new host");
 
+  // ----- a second game on the same code, ended early by the new host -----
+  click(B, "startGameBtn");
+  await all([B, C, E], p => vis(p, "write") && text(p, "barLabel") === "Round 1");
+  await answer(B, "b"); await answer(C, "c"); await answer(E, "e");
+  await all([B, C, E], p => vis(p, "guess"));
+  click(B, "menuBtn"); click(B, "hEnd");
+  await until(() => vis(B, "askVeil"));
+  check("ending the game asks first", text(B, "askText") === "End the game now? Whoever is ahead wins." && text(B, "askYes") === "End it", text(B, "askText"));
+  await yes(B);
+  await all([B, C, E], p => vis(p, "over"));
+  check("a game ended before anyone scored has no winner", text(C, "winnerLine") === "Game over" && text(C, "overLine") === "Bob called it. Here's how it finished.", text(C, "winnerLine") + " / " + text(C, "overLine"));
+  await until(() => /won 1 of 2/.test(text(C, "myStats")));
+  await wait(600);
+  const second = (await sdk.getDoc(sdk.doc(C.h.db, "users", uid(C)))).data();
+  check("a second finished game on the same code is counted too, once, and not as a win", second.w === 1 && second.g === 2 && text(C, "myStats") === "You've won 1 of 2 games.", JSON.stringify(second) + " " + text(C, "myStats"));
+  click(B, "againBtn");
+  await all([B, C, E], p => vis(p, "lobby"));
+
   // a reload keeps the seat
   const B2 = new JSDOM(html, { runScripts: "dangerously", url: "https://host.example/#" + code,
     beforeParse(w) { w.WSI_DEPS = { backend: B.h.be, game, topics }; } });
@@ -409,7 +426,6 @@ try {
 
   // now a player in the game
   await denied("a player making themselves host without the votes", sdk.updateDoc(gameRef(anon), { host: anonUid }));
-  await denied("a player stuffing the vote and taking over in one write", sdk.updateDoc(gameRef(anon), { host: anonUid, votes: [] }));
   await denied("casting someone else's vote", sdk.updateDoc(gameRef(anon), { votes: [uid(C)] }));
   await denied("a 21-entry vote list", sdk.updateDoc(gameRef(anon), { votes: Array.from({ length: 21 }, (_, i) => "v" + i) }));
   await denied("a player changing the creation time", sdk.updateDoc(gameRef(anon), { created: sdk.serverTimestamp() }));
@@ -418,11 +434,11 @@ try {
   await denied("a player dropping a field", sdk.updateDoc(gameRef(anon), { topic: sdk.deleteField() }));
   await denied("a target that is not offered", sdk.updateDoc(gameRef(anon), { target: 7 }));
   await denied("an unknown phase", sdk.updateDoc(gameRef(anon), { phase: "bogus" }));
-  await denied("an answer outside the write step, 81 characters long", sdk.updateDoc(gameRef(anon), { ["answers." + anonUid]: "x".repeat(81) }));
+  await denied("an answer outside the write step", sdk.updateDoc(gameRef(anon), { ["answers." + anonUid]: "late" }));
   await denied("a 121-character topic", sdk.updateDoc(gameRef(anon), { topic: "x".repeat(121) }));
   await denied("an empty character name", sdk.updateDoc(gameRef(anon), { ["players." + anonUid + ".n"]: "" }));
   await denied("a negative score", sdk.updateDoc(gameRef(anon), { ["players." + anonUid + ".s"]: -1 }));
-  await denied("a 21st player", sdk.updateDoc(gameRef(anon), Object.fromEntries(Array.from({ length: 17 }, (_, i) => ["players.fake" + i, seat]))));
+  await denied("a player adding seats for other people", sdk.updateDoc(gameRef(anon), { "players.fake1": seat, "players.fake2": seat }));
   await denied("more misses than the game allows", sdk.updateDoc(gameRef(anon), { misses: 4 }));
   await denied("a player changing another player's score", sdk.updateDoc(gameRef(anon), { ["players." + uid(B) + ".s"]: 3 }));
   await denied("a player removing another player", sdk.updateDoc(gameRef(anon), { ["players." + uid(B)]: sdk.deleteField() }));
@@ -447,6 +463,12 @@ try {
   await sdk.updateDoc(g2(anon), { ["players." + anonUid]: { n: "Mal", s: 0, j: 3 } });
   let st = (await sdk.getDoc(g2(A.h))).data();
   st = game.startRound(st, uid(A), { topic: "T", index: 0 }, Date.now());
+  await sdk.setDoc(g2(A.h), st);
+  // the size limits on their own: the writer is allowed to make the change, only the size is wrong
+  await denied("an 81-character answer in the write step", sdk.updateDoc(g2(anon), { ["answers." + anonUid]: "x".repeat(81) }));
+  await allowed("an 80-character answer in the write step", sdk.updateDoc(g2(anon), { ["answers." + anonUid]: "x".repeat(80) }));
+  await denied("a 21st player, even added by the host", sdk.updateDoc(g2(A.h), Object.fromEntries(Array.from({ length: 18 }, (_, i) => ["players.fake" + i, seat]))));
+  await allowed("a 20th player added by the host", sdk.updateDoc(g2(A.h), Object.fromEntries(Array.from({ length: 17 }, (_, i) => ["players.fake" + i, seat]))));
   await sdk.setDoc(g2(A.h), st);
   for (const id of [uid(A), uid(B), anonUid]) st = game.submit(st, id, { text: "t " + id }, Date.now());
   await sdk.setDoc(g2(A.h), st);
@@ -479,8 +501,11 @@ try {
   await denied("starting with five games", sdk.setDoc(stat(mal, malUid), { w: 5, g: 5 }));
   await allowed("a first finished game", sdk.setDoc(stat(mal, malUid), { w: 1, g: 1 }));
   await denied("adding two wins at once", sdk.setDoc(stat(mal, malUid), { w: 3, g: 2 }));
-  await denied("more wins than games", sdk.setDoc(stat(mal, malUid), { w: 2, g: 1 }));
   await denied("a win without a game", sdk.setDoc(stat(mal, malUid), { w: 2, g: 1 }));
+  await denied("a game uncounted", sdk.setDoc(stat(mal, malUid), { w: 1, g: 0 }));
+  const zed = backend("zed"); await zed.be.signInGoogle();
+  await denied("a first record with more wins than games", sdk.setDoc(stat(zed, zed.auth.currentUser.uid), { w: 2, g: 1 }));
+  await allowed("a first record of a game that was not won", sdk.setDoc(stat(zed, zed.auth.currentUser.uid), { w: 0, g: 1 }));
   await denied("an extra field on wins", sdk.setDoc(stat(mal, malUid), { w: 1, g: 2, email: "x" }));
   await denied("deleting wins", sdk.deleteDoc(stat(mal, malUid)));
 

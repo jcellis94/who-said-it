@@ -23,7 +23,7 @@ rules_version = '2';
 // Collection: games
 // Document ID: six characters, A-Z and 2-9 (the game code)
 // One document holds the whole game. game.js lists the fields and holds
-// the rules of play (turns, scoring, timers); phones apply them inside a
+// the rules of play (turns, scoring); phones apply them, mostly inside a
 // transaction.
 //
 // What these security rules enforce:
@@ -33,9 +33,12 @@ rules_version = '2';
 //     host changes only when enough players have voted for a new one
 //   - exact field list, types, sizes and cross-references on every write
 //   - someone not in the game may only take their own seat, at 0 points
-//   - a player who is not the host may change only their own seat and
-//     their own answer, never the target or the topic pack, and may gain
-//     points only on their own turn (1 for a guess, 3 for the last one)
+//   - a player who is not the host may not touch anyone else's seat or
+//     score, may add or change only their own answer, may not change the
+//     target or the topic pack, may cast or take back only their own vote,
+//     and may gain points only on their own turn (1 for a guess, 3 for
+//     the last one). They may move the round along (phase, turn, the
+//     round's lists), because the rules of play run on the phones.
 //   - answers change only while a round is being written
 //
 // What they do NOT enforce (accepted by the owner on 2026-11-27, "casual
@@ -190,7 +193,7 @@ service cloud.firestore {
       return data.size() == 28 &&
         data.target in [5, 10, 15, 20] &&
         data.pack is string && data.pack.size() <= 20 &&
-        data.phase in ['lobby', 'write', 'read', 'guess', 'done', 'over'] &&
+        data.phase in ['lobby', 'write', 'guess', 'done', 'over'] &&
         data.round is int &&
         data.topic is string && data.topic.size() <= 120 &&
         data.used is list && data.used.size() <= 500 &&
@@ -278,19 +281,24 @@ service cloud.firestore {
     }
 
     // The players vote for a new host (game.js voteHost). The write that
-    // casts the deciding vote hands the game to another player and takes
-    // the old host out: it needs three votes counting this one, or every
-    // other player's if there are fewer than three of them.
+    // completes the vote hands the game to another player and takes the
+    // old host out. It needs three votes counting the writer's own, or
+    // every other player's if there are fewer than three of them. The
+    // host's settings stay as they were. Scores and the round's lists are
+    // not checked here beyond their shape, because taking the old host out
+    // mid-round can end the round.
     function isHostVotedOut() {
       let uid = request.auth.uid;
       let before = resource.data;
       let after = request.resource.data;
+      let votes = before.votes.removeAll([uid]).size() + 1;
       return uid in before.players &&
         uid != before.host &&
-        !(uid in before.votes) &&
-        (before.votes.size() >= 2 || before.votes.size() + 2 >= before.players.size()) &&
+        (votes >= 3 || votes + 1 >= before.players.size()) &&
         after.host in after.players &&
-        after.votes.size() == 0;
+        after.votes.size() == 0 &&
+        after.target == before.target &&
+        after.pack == before.pack;
     }
 
     function mayPlay() {

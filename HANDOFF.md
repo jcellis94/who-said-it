@@ -6,7 +6,8 @@ this whole file before acting.
 
 ## State on 2026-11-27
 
-**Version 2 is live** at https://who-said-it-8eeaa.web.app (page version 7:
+**Version 2 is live** at https://who-said-it-8eeaa.web.app (page version 7 at the time of writing; the
+branch is at 8 after a code review:
 `window.WSI_VERSION` in `index.html`). The owner and their brother have
 played it on real phones and reported "Seems fine." To see whether the site
 matches the repository, compare the served files with the checkout, for
@@ -74,7 +75,7 @@ not objected to).
   answer to throw people") Your own answer is not marked on your screen.
   (said: "There no reason to show the 'yours' flag.")
 - No turn clock. The guesser can pass; the host can pass anyone's turn and can
-  start the reading without players who have not answered. (said)
+  start the guessing without players who have not answered. (said)
 - Quiet safety net: if nothing has happened for 2 minutes, every player gets
   the button the host has (skip the turn, or start without the missing
   players), so a missing host cannot freeze the game. (chose)
@@ -186,8 +187,7 @@ How writes work, and why:
 - The security rules compare lists of player ids against the players map
   (`inRound`, `alive`, `winners`). Any move that removes a player must clean
   every such list, in every phase, or the write is refused. Taking a player
-  out between rounds was refused for this reason until `takeOut` was fixed. The host's phone goes first, the others about a
-  second later. Phones use their own clocks.
+  out between rounds was refused for this reason until `takeOut` was fixed.
 - Every event (guess, pass, player taken out) bumps `seq` and is stored in
   `last`; a phone shows the result moment when it sees `seq` change.
 - `signInGuest` waits for Firebase to restore the saved user before deciding
@@ -217,14 +217,15 @@ How writes work, and why:
 
 `npm install && npm test` (needs Java for the emulator):
 
-- `test/game.test.mjs`: 28 tests of the rules on their own.
+- `test/game.test.mjs`: 32 tests of the rules on their own.
 - `test/backend.test.mjs`: 3 tests of sign-in on reload, against a stand-in SDK.
 - `test/phones.mjs`: five simulated phones run the real page and real SDK
   against the Auth and Firestore emulators with the real rules: three rounds
   covering the time-to-guess flash, the guess panel, a bluff with your own
-  answer, result moments, passing, both safety
-  nets, a changed topic, taking a player out, winning, saved wins and play
-  again; then about 70 direct attacks on the rules. the vote for a new host. 163 checks, ending `all passed`.
+  answer, result moments, passing, both safety nets, a changed topic, taking
+  a player out, winning, saved wins, play again, the vote for a new host and
+  a second game on the same code; then about 80 direct attacks on the rules.
+  172 checks, ending `all passed`.
 
 Also done once by hand for version 2: a round played in real phone-sized
 Chromium (real module loading, light and dark) against the emulators, with no
@@ -256,7 +257,12 @@ them before sharing the game widely.
   `firebase.json`), so a phone picks up a new version on its next load. Before
   that was added the default was one hour, and phones showed old screens.
 - Games are never cleaned up, and there is no App Check.
-- A removed player's phone returns to the character screen and can rejoin.
+- A removed player's phone shows "You're out of this game" with Rejoin, which
+  brings them back as a new player at 0 points.
+- Names are checked for duplicates on the phone only, so two people sending
+  the same name at the same instant both get it.
+- If the host taps "Play again" before a slow phone has added the finished
+  game to its saved wins, that phone's count misses the game.
 - A guest who signs in with Google after taking a seat gets a new seat; sign
   in first. The page only offers Google sign-in on the home screen.
 

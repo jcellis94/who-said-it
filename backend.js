@@ -75,8 +75,8 @@ export function makeBackend(sdk, config, options) {
     },
     /* Apply one move from game.js. The transaction re-runs the move if another
        phone changed the game first, so no move is applied to a stale state.
-       Only what the move changed is written, and players one seat at a time,
-       so two people taking a seat at the same moment do not collide. */
+       Only what the move changed is written, and the players map one entry
+       at a time, so a move never rewrites a seat it did not touch. */
     act: function (code, move) {
       var ref = game(code);
       return sdk.runTransaction(db, function (tx) {
