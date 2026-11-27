@@ -942,7 +942,6 @@ window.startWhoSaidIt = function (deps) {
         b.className = "found"; b.disabled = true;
         b.appendChild(make("span", "tag", name(who[a]) + ", caught by " + name(catcher[a])));
       } else {
-        if (a === uid) b.appendChild(make("span", "tag", "yours"));
         b.onclick = function () {
           if (s.turn !== uid) { toast("Hang on, it's " + name(s.turn) + "'s turn."); return; }
           picked = a; target = ""; render();

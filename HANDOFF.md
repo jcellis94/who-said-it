@@ -74,7 +74,8 @@ not objected to).
   extra. (said / chose)
 - You may name someone for your own answer, to throw people off; it is a
   wrong guess. (said: "You should be able to guess someone for your own
-  answer to throw people")
+  answer to throw people") Your own answer is not marked on your screen.
+  (said: "There no reason to show the 'yours' flag.")
 - No turn clock. The guesser can pass; the host can pass anyone's turn and can
   start the reading without players who have not answered. (said)
 - Quiet safety net: if nothing has happened for 2 minutes, every player gets

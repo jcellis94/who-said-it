@@ -181,8 +181,8 @@ try {
   check("round 1 starts with the first player; the others see who is guessing and who is next",
     text(A, "turnHead") === "Your turn, Ann" && el(A, "turnBox").className === "mine" && text(B, "turnHead") === "Ann is guessing" && text(B, "turnLine") === "You're up next." && text(C, "turnLine") === "Up next: Bob",
     text(A, "turnHead") + " / " + text(B, "turnLine") + " / " + text(C, "turnLine"));
-  check("no phone shows who wrote an unguessed answer",
-    [A, B, C, D].every(p => p.d.querySelectorAll("#answerList .tag").length === 1 && p.d.querySelector("#answerList .tag").textContent === "yours"));
+  check("no phone marks any unguessed answer, not even your own",
+    [A, B, C, D].every(p => p.d.querySelectorAll("#answerList .tag").length === 0));
   answers(B)[0].click();
   check("tapping an answer out of turn only says whose turn it is", /Hang on, it's Ann's turn\./.test(text(B, "toast")) && !vis(B, "pickVeil"), text(B, "toast"));
 
@@ -211,7 +211,6 @@ try {
   check("the matched answer names its writer and who caught them", answers(C).find(b => own(b) === "<i>the dog</i>").querySelector(".tag").textContent === "Bob, caught by Ann");
   check("a right guess keeps the turn", text(A, "turnHead") === "Your turn, Ann");
 
-  check("your own answer is marked for you and can still be picked, to bluff", !answers(A).find(b => own(b) === "naps").disabled && answers(A).find(b => own(b) === "naps").querySelector(".tag").textContent === "yours");
   await guess(A, "naps", "Dee <b>x</b>");   // Ann names Dee for Ann's own answer: a bluff
   await Promise.all([moment(A, /Nope\./), moment(D, /Safe!/), moment(B, /Nope!/)]);
   check("a bluff with your own answer goes through as a wrong guess, with a moment that says who is up",
