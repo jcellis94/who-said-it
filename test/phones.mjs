@@ -223,15 +223,15 @@ try {
   check("a right guess keeps the turn", text(A, "turnHead") === "Your turn, Ann");
 
   check("your own answer is marked for you and can still be picked, to bluff", !answers(A).find(b => own(b) === "naps").disabled && answers(A).find(b => own(b) === "naps").querySelector(".tag").textContent === "yours");
-  await guess(A, "gravy", "Dee <b>x</b>");
+  await guess(A, "naps", "Dee <b>x</b>");   // Ann names Dee for Ann's own answer: a bluff
   await Promise.all([moment(A, /Nope\./), moment(D, /Safe!/), moment(B, /Nope!/)]);
-  check("a wrong guess is a moment too, and says who is up",
-    /Nope\.Dee <b>x<\/b> didn't write that\.Cy is up\. Wrong means the next person goes\./.test(mom(A)) && /Safe!Ann thought you wrote “gravy”\./.test(mom(D)) && /Nope!Ann guessed Dee <b>x<\/b> for “gravy”\./.test(mom(B)) && /You're up\./.test(mom(C)),
+  check("a bluff with your own answer goes through as a wrong guess, with a moment that says who is up",
+    /Nope\.Dee <b>x<\/b> didn't write that\.Cy is up\. Wrong means the next person goes\./.test(mom(A)) && /Safe!Ann thought you wrote “naps”\./.test(mom(D)) && /Nope!Ann guessed Dee <b>x<\/b> for “naps”\./.test(mom(B)) && /You're up\./.test(mom(C)),
     mom(A) + " | " + mom(D) + " | " + mom(C));
   await all([A, B, C, D], p => p === C ? text(p, "turnHead") === "Your turn, Cy" : text(p, "turnHead") === "Cy is guessing");
   check("a wrong guess moves the turn on, past the caught player, and scores nothing", /^Ann=1, Bob=0/.test(scores(B)));
   check("the 'So far' list keeps both guesses, newest first",
-    texts(B, "#logList li").join(" | ") === "Ann guessed Dee <b>x</b> for “gravy”. Nope. | Ann caught Bob: “<i>the dog</i>”", texts(B, "#logList li").join(" | "));
+    texts(B, "#logList li").join(" | ") === "Ann guessed Dee <b>x</b> for “naps”. Nope. | Ann caught Bob: “<i>the dog</i>”", texts(B, "#logList li").join(" | "));
 
   refusal = "";
   await B.h.be.act(code, st => game.guess(st, uid(B), { answer: uid(A), target: uid(A) }, Date.now())).catch(e => { refusal = e.message; });

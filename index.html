@@ -1190,14 +1190,17 @@ const config = {
 };
 if (!window.WSI_DEPS) {
   const cdn = "https://www.gstatic.com/firebasejs/13.4.0/";
+  /* Change this whenever game.js, backend.js or topics.js changes, so a phone
+     never runs a new page with an old copy of them. */
+  const version = "?v=4";
   try {
     const [app, auth, store, backend, game, topics] = await Promise.all([
       import(cdn + "firebase-app.js"),
       import(cdn + "firebase-auth.js"),
       import(cdn + "firebase-firestore.js"),
-      import("./backend.js"),
-      import("./game.js"),
-      import("./topics.js")
+      import("./backend.js" + version),
+      import("./game.js" + version),
+      import("./topics.js" + version)
     ]);
     const sdk = Object.assign({}, app, auth, store);
     /* WSI_TEST is set only by the automated browser check, to point at the emulators. */

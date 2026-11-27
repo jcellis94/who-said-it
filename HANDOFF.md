@@ -219,6 +219,10 @@ them before sharing the game widely.
 
 ## Limits to know about
 
+- The module script in `index.html` loads `game.js`, `backend.js` and
+  `topics.js` with a `?v=N` suffix. **Bump N whenever one of them changes.**
+  The owner hit a new page running an old `game.js`: the page let them bluff
+  with their own answer and the old rules refused it at the last step.
 - Hosting sends `Cache-Control: no-cache` for the page and scripts (set in
   `firebase.json`), so a phone picks up a new version on its next load. Before
   that was added the default was one hour, and phones showed old screens.
