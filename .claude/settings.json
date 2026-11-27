@@ -1,13 +1,20 @@
 {
+  "enabledPlugins": {
+    "mattpocock-skills@mattpocock": true,
+    "firebase@firebase": true
+  },
   "extraKnownMarketplaces": {
     "mattpocock": {
       "source": {
         "source": "github",
         "repo": "mattpocock/skills"
       }
+    },
+    "firebase": {
+      "source": {
+        "source": "github",
+        "repo": "firebase/agent-skills"
+      }
     }
-  },
-  "enabledPlugins": {
-    "mattpocock-skills@mattpocock": true
   }
 }
