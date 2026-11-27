@@ -263,10 +263,6 @@ service cloud.firestore {
         request.resource.data.answers.size() == 0;
     }
 
-    function isInGame(data) {
-      return request.auth.uid == data.host || request.auth.uid in data.players;
-    }
-
     // A player who is not the host: their own seat and answer only, the
     // host's settings untouched, and points only on their own turn.
     function ownScoreGain() {
