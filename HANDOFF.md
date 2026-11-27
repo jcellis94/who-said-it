@@ -130,3 +130,44 @@ Lead with the result. Keep replies to a phone screen. Say plainly what is
 tested and what is not. When you need something from them (a value, a tap in a
 console), give numbered steps written for a phone browser, and explain any
 choice in plain words with a recommendation.
+
+## Next version: rules agreed with the owner on 2026-11-27
+
+The owner confirmed the live two-device game works, then asked for a redesign
+from scratch in a separate session. The current page is the prototype; the
+live site stays up until the new one is ready. The Firebase project, sign-in
+setup and hosting are reused.
+
+What the owner said, in their words where it matters:
+
+- Sign-in is optional for everyone "no matter what", and required to create a
+  game. Anyone joins a game by entering a code.
+- "Before beginning they have to say what their character name is."
+- Each player gives one response to the topic on their own phone, "anonymously
+  associated with their character".
+- "On your turn you can guess what item belongs to whom. When right it auto
+  points you." When guessed, the character is grayed out.
+
+What the owner chose when asked (each was the recommended option):
+
+- A right guess earns another guess; a wrong guess passes the turn to the next
+  player in join order.
+- A guessed player is out for the rest of the round and takes no more turns.
+  The last unguessed player scores 2 bonus points.
+- Answers appear on every phone, shuffled, once every player has submitted.
+- Redesign from scratch rather than evolve the current page.
+
+Consequences the previous session inferred (not stated by the owner): paper
+goes away, so every player needs a phone; the app enforces turns, checks
+guesses and keeps score, where today any phone can tap anything.
+
+Open, not yet asked: what a signed-in guest gets that an anonymous one does
+not; what happens when a player leaves or never answers; whether the host can
+skip or remove a player; how a game ends; the page title and topic set (see
+Background).
+
+The hard design problem: who wrote which answer must stay hidden from other
+phones until guessed, yet guesses must be checked. There is no server code, and
+Cloud Functions need the paid Blaze plan; the owner wants this free. Decide
+how much secrecy a family game needs and say plainly what the chosen design
+does and does not hide.
