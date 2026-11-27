@@ -6,9 +6,13 @@ this whole file before acting.
 
 ## State on 2026-11-27
 
-**Version 2 ("Read it out") is built and tested in the emulator, on branch
-`claude/bold-allen-05u2q8`. Check `git log` and the live site to see whether
-it has been deployed**; version 1 (timers, no reader) was live before it.
+**Version 2 ("Read it out") is live** at https://who-said-it-8eeaa.web.app,
+deployed from branch `claude/bold-allen-05u2q8` (rules, then hosting) with the
+owner's go-ahead. Checked on the live site as a guest: the page loads with no
+errors and an unknown code reads "Can't find game". No real game has been
+played on it yet. If a guest's guess is refused on the real project, suspect
+the expression limit (see Data) and redeploy the previous commit's hosting and
+rules while fixing it.
 
 How version 2 came about: the owner played version 1 on real phones ("It all
 works!"), then had a designer agent review the flow. The review is not in the
@@ -20,8 +24,7 @@ Tapping after is fine to end the turn."
 
 Next:
 
-1. Deploy if not yet done (rules, then hosting; steps below), then the owner
-   plays one real game. A game created by version 1 cannot be continued by
+1. The owner plays one real game. A game created by version 1 cannot be continued by
    version 2; the page says "That game has ended."
 2. Watch for the things the designer wanted tested with a real family: does
    the reader read aloud unprompted; how long until someone notices their
