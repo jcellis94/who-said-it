@@ -514,6 +514,15 @@ try {
   await allowed("the old page: a guest adding a player", sdk.setDoc(sdk.doc(anon.db, "rooms", "OLD222", "players", "abcdefghiABCDEF"), { n: "Old", s: 0, o: 0 }));
   await denied("the old page: a guest creating a room", sdk.setDoc(sdk.doc(anon.db, "rooms", "OLD333"), { host: anonUid, created: sdk.serverTimestamp(), round: 1 }));
   await denied("writing to a collection the app does not use", sdk.setDoc(sdk.doc(anon.db, "other", "x"), { a: 1 }));
+
+  // the write that completes a host vote: last, because it changes who hosts the first game
+  await sdk.updateDoc(gameRef(C.h), { votes: sdk.arrayUnion(uid(C)) });
+  await sdk.updateDoc(gameRef(E.h), { votes: sdk.arrayUnion(uid(E)) });
+  await denied("completing a host vote and changing the target in the same write", sdk.updateDoc(gameRef(anon), { host: anonUid, votes: [], target: 20 }));
+  await denied("completing a host vote and changing the topic pack in the same write", sdk.updateDoc(gameRef(anon), { host: anonUid, votes: [], pack: "christmas" }));
+  await denied("completing a host vote in favour of someone who is not a player", sdk.updateDoc(gameRef(anon), { host: "ghost", votes: [] }));
+  await denied("completing a host vote but keeping the votes", sdk.updateDoc(gameRef(anon), { host: anonUid }));
+  await allowed("completing a host vote with the third vote", sdk.updateDoc(gameRef(anon), { host: anonUid, votes: [] }));
 } catch (e) {
   failed++;
   console.log("FAIL  the test itself crashed: " + (e && e.stack || e));

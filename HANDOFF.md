@@ -185,7 +185,8 @@ How writes work, and why:
 - The only thing a phone does by itself is ask for `allIn` when it sees every
   answer is in. There are no deadlines in the state.
 - The security rules compare lists of player ids against the players map
-  (`inRound`, `alive`, `winners`). Any move that removes a player must clean
+  (`inRound` against players, `alive` against `inRound`, `shuffle` against
+  `answers`, the turn against `alive`). Any move that removes a player must clean
   every such list, in every phase, or the write is refused. Taking a player
   out between rounds was refused for this reason until `takeOut` was fixed.
 - Every event (guess, pass, player taken out) bumps `seq` and is stored in
@@ -196,6 +197,9 @@ How writes work, and why:
   "I backed out as host and it is asking me to give a name now").
   `test/backend.test.mjs` covers it. The name screen also offers "Already in
   this game? Sign in with Google" and "Back to the start".
+- `backend.act` retries a move twice when the rules refuse it. Two phones
+  moving at the same instant can make the rules judge one write against the
+  other's result and refuse it before Firestore reports the conflict.
 - The page takes the game state only from the live listener, never from the
   result of its own write. Keep that: the result can be older than what the
   listener already delivered.
@@ -217,7 +221,7 @@ How writes work, and why:
 
 `npm install && npm test` (needs Java for the emulator):
 
-- `test/game.test.mjs`: 32 tests of the rules on their own.
+- `test/game.test.mjs`: 33 tests of the rules on their own.
 - `test/backend.test.mjs`: 3 tests of sign-in on reload, against a stand-in SDK.
 - `test/phones.mjs`: five simulated phones run the real page and real SDK
   against the Auth and Firestore emulators with the real rules: three rounds
@@ -225,7 +229,7 @@ How writes work, and why:
   answer, result moments, passing, both safety nets, a changed topic, taking
   a player out, winning, saved wins, play again, the vote for a new host and
   a second game on the same code; then about 80 direct attacks on the rules.
-  172 checks, ending `all passed`.
+  177 checks, ending `all passed`.
 
 Also done once by hand for version 2: a round played in real phone-sized
 Chromium (real module loading, light and dark) against the emulators, with no

@@ -250,6 +250,17 @@ test("a vote says which way it goes, so a late tap cannot flip it", () => {
   assert.deepEqual(G.voteHost(s, "cy", { on: false }, 1).votes, []);
 });
 
+test("a vote names the host it is against, so it never lands on a new host", () => {
+  let s = table(["Ann", "Bob", "Cy", "Dee", "Eve"]);
+  s = G.voteHost(G.voteHost(s, "cy", null, 1), "dee", null, 1);
+  s = G.remove(G.remove(s, "h", { player: "bob" }, 1), "h", { player: "eve" }, 1);
+  // both voters' phones see "enough votes" and ask at once; cy's lands first
+  const first = G.voteHost(s, "cy", { on: true, host: "h" }, 2);
+  assert.equal(first.host, "cy"); assert.deepEqual(G.seats(first), ["cy", "dee"]);
+  says(() => G.voteHost(first, "dee", { on: true, host: "h" }, 2), /host has already changed/);
+  assert.equal(G.voteHost(first, "dee", { on: true, host: "cy" }, 3).host, "dee", "a vote that names the new host still counts");
+});
+
 test("when players leaving makes the votes enough, a voter asking again completes it", () => {
   let s = table(["Ann", "Bob", "Cy", "Dee", "Eve"]);
   s = G.voteHost(G.voteHost(s, "cy", null, 1), "dee", null, 1);

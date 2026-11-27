@@ -845,11 +845,12 @@ window.startWhoSaidIt = function (deps) {
   /* Any player but the host: vote for a new host, or take the vote back. */
   function voteNew() {
     show("menuVeil", false);
-    if (s.votes.indexOf(me.uid) >= 0) { quietly(act("voteHost", { on: false })); return; }
+    var host = s.host;   // the host this vote is about, even if the answer comes later
+    if (s.votes.indexOf(me.uid) >= 0) { quietly(act("voteHost", { on: false, host: host })); return; }
     var need = G.votesNeeded(s), heir = G.seats(s).filter(function (id) { return id !== s.host; })[0];
     ask("Vote for a new host? It takes " + need + (need === 1 ? " vote. " : " votes. ") + hostName() + " would be taken out of the game and " +
       (heir === me.uid ? "you" : name(heir)) + " would become host.", "Vote", "Never mind").then(function (yes) {
-      if (yes) quietly(act("voteHost", { on: true }));
+      if (yes) quietly(act("voteHost", { on: true, host: host }));
     });
   }
   $("mVote").onclick = voteNew; $("voteDone").onclick = voteNew; $("voteLobby").onclick = voteNew;
@@ -882,7 +883,7 @@ window.startWhoSaidIt = function (deps) {
       once("allin" + s.round, 4000, function () { return act("allIn", null, true); });
     } else if (s.votes.indexOf(me.uid) >= 0 && s.votes.length >= G.votesNeeded(s)) {
       /* players leaving made the votes enough: a voter's phone completes it */
-      once("votes" + s.seq, 4000, function () { return act("voteHost", { on: true }, true); });
+      once("votes" + s.seq, 4000, function () { return act("voteHost", { on: true, host: s.host }, true); });
     }
     if (s.phase === "over") creditMe();   // again here, in case the first try failed
     /* the safety-net buttons appear without anything else changing */
@@ -920,7 +921,7 @@ window.startWhoSaidIt = function (deps) {
     $("lobbyCount").textContent = "In so far (" + n + ")";
     var box = $("lobbyList"); box.textContent = "";
     G.seats(s).forEach(function (id) { box.appendChild(person(id)); });
-    $("targetSelect").value = String(s.target); $("packSelect").value = s.pack;
+    if (!sending) { $("targetSelect").value = String(s.target); $("packSelect").value = s.pack; }
     var enough = n >= G.RULES.MIN_PLAYERS;
     $("startGameBtn").disabled = !enough || sending;
     $("startGameBtn").textContent = enough ? "Everyone's in, start" : "Waiting for one more player";
@@ -1080,9 +1081,13 @@ window.startWhoSaidIt = function (deps) {
      the list of who has been counted; this only avoids asking twice at once. */
   function creditMe() {
     if (crediting || !s || s.phase !== "over" || !me.google || !amIn() || s.credited.indexOf(me.uid) >= 0) return;
+    if (Date.now() - creditMe.at < 5000) return;   // a try that failed is not repeated at once
+    creditMe.at = Date.now();
     crediting = true;
     be.creditGame(code).then(function () { crediting = false; }, function () { crediting = false; });
   }
+
+  creditMe.at = 0;
 
   function drawVote() {
     var can = amIn() && !isHost(), mine = s.votes.indexOf(me.uid) >= 0, n = s.votes.length, need = G.votesNeeded(s);
@@ -1187,9 +1192,11 @@ window.startWhoSaidIt = function (deps) {
   var stale = false;
   /* Not a moment to reload: something typed and not sent, a panel open, or a move on its way. */
   function busy() {
-    var typed = ["codeInput", "nameInput", "answerInput", "ownTopicInput", "tOwnInput"].some(function (id) {
+    /* an answer or topic being written, or a field the player is in right now;
+       the code and name boxes are often filled in by the page itself */
+    var typed = ["answerInput", "ownTopicInput", "tOwnInput"].some(function (id) {
       return $(id).value !== "" && $(id).offsetParent !== null;
-    });
+    }) || (!!document.activeElement && document.activeElement.tagName === "INPUT" && document.activeElement.value !== "");
     var open = ["menuVeil", "pickVeil", "askVeil"].some(function (id) { return !$(id).hidden; });
     return typed || open || sending || navigator.onLine === false;
   }

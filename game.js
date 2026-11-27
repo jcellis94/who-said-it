@@ -216,7 +216,7 @@ function settle(s) {
   var top = leaders(s);
   if (s.note === "tie") s.note = "";
   if (top.length && s.players[top[0]].s >= s.target) {
-    if (top.length === 1) { s.phase = "over"; s.winners = top; }
+    if (top.length === 1) { s.phase = "over"; s.winners = top; s.note = ""; }
     else s.note = "tie";
   }
 }
@@ -392,12 +392,15 @@ export function votesNeeded(s) {
 
 /* A player votes for a new host, or takes the vote back. With enough votes
    the host is taken out of the game and the longest-seated other player
-   becomes host. The page says which it wants (args.on), so a late tap cannot
-   flip a vote the other way. A voter asking again once the count is reached
+   becomes host. The page says which it wants (args.on) and which host it
+   means (args.host), so a late tap cannot flip a vote or hit a new host. A voter asking again once the count is reached
    (it can be reached by players leaving) completes the change. */
 export function voteHost(s, uid, args, now, rand) {
   if (!s.players[uid]) fail("You are not in this game.");
   if (uid === s.host) fail("You are the host.");
+  /* The page says which host the vote is about, so a vote that arrives after
+     the host has changed is not counted against the new one. */
+  if (args && args.host && args.host !== s.host) fail("The host has already changed.");
   s = clone(s);
   var has = s.votes.indexOf(uid) >= 0;
   var want = args && typeof args.on === "boolean" ? args.on : !has;

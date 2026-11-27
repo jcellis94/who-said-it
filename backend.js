@@ -79,25 +79,38 @@ export function makeBackend(sdk, config, options) {
        at a time, so a move never rewrites a seat it did not touch. */
     act: function (code, move) {
       var ref = game(code);
-      return sdk.runTransaction(db, function (tx) {
-        return tx.get(ref).then(function (snap) {
-          if (!snap.exists()) throw new Error("That game no longer exists.");
-          var before = snap.data(), next = move(before), args = [];
-          function differs(a, b) { return JSON.stringify(a) !== JSON.stringify(b); }
-          Object.keys(next).forEach(function (k) {
-            if (k === "created" || k === "players" || !differs(before[k], next[k])) return;
-            args.push(new sdk.FieldPath(k), next[k]);
+      function attempt(triesLeft) {
+        return sdk.runTransaction(db, function (tx) {
+          return tx.get(ref).then(function (snap) {
+            if (!snap.exists()) throw new Error("That game no longer exists.");
+            var before = snap.data(), next = move(before), args = [];
+            function differs(a, b) { return JSON.stringify(a) !== JSON.stringify(b); }
+            Object.keys(next).forEach(function (k) {
+              if (k === "created" || k === "players" || !differs(before[k], next[k])) return;
+              args.push(new sdk.FieldPath(k), next[k]);
+            });
+            Object.keys(next.players).forEach(function (id) {
+              if (differs(before.players[id], next.players[id])) args.push(new sdk.FieldPath("players", id), next.players[id]);
+            });
+            Object.keys(before.players).forEach(function (id) {
+              if (!next.players[id]) args.push(new sdk.FieldPath("players", id), sdk.deleteField());
+            });
+            if (args.length) tx.update.apply(tx, [ref].concat(args));
+            return next;
           });
-          Object.keys(next.players).forEach(function (id) {
-            if (differs(before.players[id], next.players[id])) args.push(new sdk.FieldPath("players", id), next.players[id]);
-          });
-          Object.keys(before.players).forEach(function (id) {
-            if (!next.players[id]) args.push(new sdk.FieldPath("players", id), sdk.deleteField());
-          });
-          if (args.length) tx.update.apply(tx, [ref].concat(args));
-          return next;
+        }, { maxAttempts: 10 }).catch(function (e) {
+          /* When another phone's move lands between this one's read and its
+             write, the security rules can judge the write against the newer
+             game and refuse it before Firestore notices the conflict. A
+             refusal is not retried by the SDK, so try again from a fresh read:
+             the move is re-checked there and a real refusal comes back again. */
+          if (e && e.code === "permission-denied" && triesLeft > 0) {
+            return new Promise(function (resolve) { setTimeout(resolve, 150); }).then(function () { return attempt(triesLeft - 1); });
+          }
+          throw e;
         });
-      }, { maxAttempts: 10 });
+      }
+      return attempt(2);
     },
     /* Write fields without reading first: a player's own name or answer.
        Everyone does these at the same moment (joining, finishing an answer),
