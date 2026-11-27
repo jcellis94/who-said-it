@@ -1,993 +1,1261 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Thanksgiving Things</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b2350">
+<title>Who Said It</title>
 <style>
-  /* Layout idea: one phone-width column. Round label on top, the topic as the
-     single loud element on a cranberry card, two big buttons under it. */
   :root {
-    --bg: #f4eef1;
-    --ink: #2a1620;
-    --muted: #6f5a64;
-    --card: #8e1f3f;
-    --card-ink: #fff6ea;
-    --gold: #e0a526;
-    --line: #dccfd5;
-    --font-display: "Bricolage Grotesque", "Trebuchet MS", "Segoe UI", sans-serif;
-    --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
-    color-scheme: light;
+    --bg: #f6f3ee; --card: #ffffff; --ink: #1f1a33; --soft: #6b6580; --line: #e3ded4;
+    --brand: #5b3fd6; --brand-ink: #ffffff; --good: #16794c; --bad: #b3312b; --gold: #b7791f;
+    --pick: #efeaff; --out: #8d879e; --turn: #5b3fd6; --turn-ink: #ffffff;
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #1c1117;
-      --ink: #f6eaef;
-      --muted: #b9a3ad;
-      --card: #a32a4d;
-      --card-ink: #fff6ea;
-      --gold: #f0bb45;
-      --line: #3a2731;
-      color-scheme: dark;
+    :root {
+      --bg: #15121f; --card: #211c33; --ink: #f1eefb; --soft: #a59fbd; --line: #352e4d;
+      --brand: #8f78ff; --brand-ink: #15121f; --good: #5fd39a; --bad: #ff8a80; --gold: #f2c066;
+      --pick: #33295c; --out: #8a84a3; --turn: #8f78ff; --turn-ink: #15121f;
     }
   }
-  :root[data-theme="dark"] {
-    --bg: #1c1117;
-    --ink: #f6eaef;
-    --muted: #b9a3ad;
-    --card: #a32a4d;
-    --card-ink: #fff6ea;
-    --gold: #f0bb45;
-    --line: #3a2731;
-    color-scheme: dark;
-  }
-
   * { box-sizing: border-box; }
-  html, body { margin: 0; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    background: var(--bg);
-    color: var(--ink);
-    font-family: var(--font-body);
-    font-size: 17px;
-    line-height: 1.5;
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) 16px calc(32px + env(safe-area-inset-bottom));
   }
-  main {
-    max-width: 520px;
-    margin: 0 auto;
-    padding: 24px 20px 40px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+  main { max-width: 520px; margin: 0 auto; }
+  [hidden] { display: none !important; }
+  h1 { font-size: 32px; line-height: 1.1; margin: 24px 0 6px; letter-spacing: -0.02em; text-wrap: balance; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--soft); margin: 22px 0 8px; font-weight: 600; }
+  p { margin: 8px 0; }
+  .soft { color: var(--soft); }
+  .small { font-size: 15px; }
+  .lead { font-size: 19px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 12px 0; }
+  input, select, button { font: inherit; color: inherit; }
+  input[type=text], select {
+    width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--bg); min-height: 52px;
   }
-  header {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 12px;
-    flex-wrap: wrap;
-  }
-  h1 {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 22px;
-    margin: 0;
-    letter-spacing: -0.01em;
-  }
-  .round {
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 15px;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
-  }
-  .round b { color: var(--ink); font-weight: 800; font-size: 20px; }
-
-  .card {
-    background: var(--card);
-    color: var(--card-ink);
-    border-radius: 22px;
-    padding: 30px 24px 34px;
-    min-height: 250px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    border-bottom: 8px solid var(--gold);
-  }
-  .card .label {
-    font-family: var(--font-display);
-    font-weight: 600;
-    font-size: 14px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--gold);
-  }
-  .topic {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: clamp(28px, 8.4vw, 40px);
-    line-height: 1.12;
-    letter-spacing: -0.015em;
-    margin: 0;
-    text-wrap: balance;
-    overflow-wrap: break-word;
-  }
-
-  .answers {
-    border: 2px solid var(--line);
-    border-radius: 16px;
-    padding: 16px 18px;
-  }
-  .answers h2 {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 17px;
-    margin: 0 0 10px;
-  }
-  .answers ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .answers .hint { margin: 0 0 12px; color: var(--muted); font-size: 15px; }
-  .answers li { display: flex; }
-  .answers li button {
-    font-family: var(--font-body);
-    font-size: 17px;
-    font-weight: 600;
-    text-align: left;
-    border: 2px solid var(--ink);
-    border-radius: 999px;
-    padding: 9px 16px;
-    overflow-wrap: anywhere;
-  }
-  .answers li button[aria-pressed="true"] {
-    border-color: var(--line);
-    color: var(--muted);
-    text-decoration: line-through;
-    text-decoration-thickness: 2px;
-  }
-  .answers li button[aria-pressed="true"]::before {
-    content: "\2713\00a0";
-    display: inline-block;
-    text-decoration: none;
-    color: var(--gold);
-  }
-
-  .controls { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
   button {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 19px;
-    border-radius: 16px;
-    padding: 18px 12px;
-    cursor: pointer;
-    border: 2px solid var(--ink);
-    background: transparent;
-    color: var(--ink);
+    width: 100%; min-height: 52px; padding: 12px 16px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--card); cursor: pointer; text-align: center; font-weight: 600;
   }
-  button.next { background: var(--ink); color: var(--bg); }
-  button:disabled { opacity: 0.35; cursor: default; }
-  button:focus-visible, input:focus-visible {
-    outline: 3px solid var(--gold);
-    outline-offset: 3px;
-  }
+  button.main { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+  button.quiet { border-color: transparent; background: transparent; color: var(--soft); font-weight: 500; min-height: 44px; text-decoration: underline; }
+  button:disabled { opacity: 0.55; cursor: default; }
+  form { display: grid; gap: 10px; }
+  .stack { display: grid; gap: 10px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .msg { color: var(--bad); min-height: 1.4em; }
+  ul, ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  ol.steps { list-style: decimal; padding-left: 22px; gap: 6px; }
 
-  .jump {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    color: var(--muted);
-    font-size: 15px;
-  }
-  .jump input {
-    width: 76px;
-    font: inherit;
-    font-variant-numeric: tabular-nums;
-    padding: 9px 10px;
-    border-radius: 10px;
-    border: 2px solid var(--line);
-    background: transparent;
-    color: var(--ink);
-  }
-  .jump button { font-size: 15px; padding: 10px 16px; border-radius: 10px; }
+  #bar { display: flex; align-items: center; gap: 8px; padding: 10px 0 0; min-height: 54px; }
+  #barLabel { font-weight: 700; flex: 1; }
+  #bar button { width: auto; min-height: 44px; padding: 8px 16px; }
 
-  .scores {
-    border-top: 2px solid var(--line);
-    padding-top: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .scores h2 {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 17px;
-    margin: 0;
-  }
-  .scores .note { margin: 0; color: var(--muted); font-size: 15px; }
-  #playerList { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  #playerList li {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border: 2px solid var(--line);
-    border-left: 8px solid var(--line);
-    border-radius: 12px;
-  }
-  #playerList li.lead { border-left-color: var(--gold); }
-  .pname { font-weight: 600; overflow-wrap: anywhere; }
-  .pscore {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 24px;
-    font-variant-numeric: tabular-nums;
-    min-width: 2ch;
-    text-align: right;
-  }
-  .pbtns { display: flex; gap: 6px; }
-  .pbtns button {
-    font-size: 16px;
-    padding: 10px 0;
-    width: 46px;
-    border-radius: 10px;
-    font-variant-numeric: tabular-nums;
-  }
-  .pbtns button.plus { background: var(--ink); color: var(--bg); }
-  .addrow { display: flex; gap: 10px; }
-  .addrow input {
-    flex: 1;
-    min-width: 0;
-    font: inherit;
-    padding: 11px 12px;
-    border-radius: 10px;
-    border: 2px solid var(--line);
-    background: transparent;
-    color: var(--ink);
-  }
-  .addrow button, .resets button { font-size: 15px; padding: 10px 16px; border-radius: 10px; }
-  .resets { display: flex; gap: 10px; flex-wrap: wrap; }
-  .resets button { border-color: var(--line); color: var(--muted); font-weight: 600; }
-  .resets button.armed { border-color: var(--card); color: var(--card); }
-  :root[data-theme="dark"] .resets button.armed { border-color: var(--gold); color: var(--gold); }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .resets button.armed { border-color: var(--gold); color: var(--gold); }
-  }
+  #homeCards { display: flex; flex-direction: column; }
+  #homeCards.signedIn #hostCard { order: -1; }
+  .bigcode { font: 700 44px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.14em; text-align: center; margin: 6px 0 10px; }
+  canvas.qr { display: block; margin: 0 auto 10px; width: 180px; height: 180px; border-radius: 8px; background: #fff; }
+  .topic { font-size: 24px; line-height: 1.25; font-weight: 700; margin: 10px 0 8px; letter-spacing: -0.01em; text-wrap: balance; }
 
-  .syncrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: -8px; }
-  .syncrow button { font-size: 15px; padding: 8px 16px; border-radius: 10px; flex: none; }
-  .syncedAt { margin: 0; color: var(--muted); font-size: 14px; }
-  .answers .addrow { margin-top: 12px; }
-  .sync {
-    border-top: 2px solid var(--line);
-    padding-top: 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .sync h2 { font-family: var(--font-display); font-weight: 800; font-size: 17px; margin: 0; }
-  .sync p { margin: 0; color: var(--muted); font-size: 15px; }
-  .sync button { font-size: 17px; padding: 14px 12px; }
-  .sync button.armed { background: var(--card); border-color: var(--card); color: var(--card-ink); }
+  /* the top of the guess screen changes colour on your turn */
+  #turnBox { border-radius: 16px; padding: 14px 16px; margin: 12px 0; background: var(--card); border: 1px solid var(--line); }
+  #turnBox.mine { background: var(--turn); color: var(--turn-ink); border-color: var(--turn); }
+  #turnBox.mine .soft { color: inherit; opacity: 0.9; }
+  #turnHead { font-size: 26px; font-weight: 800; line-height: 1.15; margin: 0; }
+  .banner { border-left: 4px solid var(--brand); background: var(--card); padding: 10px 14px; border-radius: 0 12px 12px 0; }
 
-  .how {
-    border-top: 2px solid var(--line);
-    padding-top: 18px;
+  #answerList button, #revealList li, #logList li {
+    text-align: left; font-weight: 500; padding: 14px; border-radius: 12px;
+    border: 1px solid var(--line); background: var(--card); width: 100%;
   }
-  .how h2 {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 17px;
-    margin: 0 0 8px;
-  }
-  .how ol { margin: 0; padding-left: 22px; color: var(--muted); display: grid; gap: 6px; }
-  .how li::marker { font-weight: 600; color: var(--ink); }
+  #answerList button.found { color: var(--out); }
+  #answerList button.found .text { text-decoration: line-through; }
+  .tag { display: block; font-size: 14px; color: var(--soft); margin-top: 2px; }
+  #logList li { padding: 10px 14px; font-size: 15px; }
 
-  /* Room-code version */
-  .panel {
-    border: 2px solid var(--line);
-    border-radius: 16px;
-    padding: 20px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+  .people li, #lobbyList li {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px;
+    background: var(--card); border: 1px solid var(--line);
   }
-  .panel h2 { font-family: var(--font-display); font-weight: 800; font-size: 19px; margin: 0; }
-  .panel h2.gap { margin-top: 14px; padding-top: 18px; border-top: 2px solid var(--line); }
-  .panel p { margin: 0; color: var(--muted); font-size: 15px; }
-  .panel .msg { color: var(--ink); font-weight: 600; min-height: 1.5em; }
-  .panel #codeInput {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 22px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
+  .pname { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
+  .pscore { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2ch; text-align: right; }
+  .people li.me, #lobbyList li.me { border-color: var(--brand); }
+  .people li.top .pscore { color: var(--gold); }
+
+  #headline { font-size: 30px; font-weight: 800; line-height: 1.15; margin: 18px 0 4px; text-wrap: balance; }
+  #winnerLine { font-size: 34px; font-weight: 800; line-height: 1.1; margin: 22px 0 6px; text-wrap: balance; }
+
+  /* panels that slide up over the board */
+  .veil { position: fixed; inset: 0; background: rgba(15, 10, 30, 0.55); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet {
+    background: var(--bg); width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; overscroll-behavior: contain;
+    border-radius: 20px 20px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
   }
-  button.wide { background: var(--ink); color: var(--bg); }
-  #game { display: flex; flex-direction: column; gap: 20px; }
-  #game[hidden] { display: none; }
-  .gamebar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 6px 12px;
-    margin-top: -8px;
+  .sheet h3 { font-size: 20px; margin: 4px 0 10px; }
+  .quote { font-size: 20px; font-weight: 700; margin: 6px 0 14px; text-wrap: balance; }
+  #pickNames { grid-template-columns: 1fr 1fr; }
+
+  /* a result fills the screen for a moment */
+  #moment {
+    position: fixed; inset: 0; z-index: 20; background: var(--ink); color: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 28px; gap: 12px;
   }
-  .codebox { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-  .codelabel { color: var(--muted); font-size: 14px; }
-  .codebox b {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: 22px;
-    letter-spacing: 0.14em;
-    font-variant-numeric: tabular-nums;
+  #moment.ok { background: var(--good); color: #fff; }
+  #moment.no { background: var(--bad); color: #fff; }
+  @media (prefers-color-scheme: dark) { #moment.ok, #moment.no { color: #15121f; } }
+  #momentHead { font-size: 40px; font-weight: 800; line-height: 1.1; text-wrap: balance; }
+  #momentBody { font-size: 22px; line-height: 1.3; text-wrap: balance; }
+  #momentMore { font-size: 17px; opacity: 0.9; }
+
+  #toast {
+    position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
+    max-width: 488px; margin: 0 auto; background: var(--ink); color: var(--bg);
+    padding: 14px 16px; border-radius: 12px; text-align: center; z-index: 30;
   }
-  .barbtns { display: flex; gap: 8px; }
-  .barbtns button { font-size: 15px; padding: 8px 14px; border-radius: 10px; }
-  .live, .invite { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
-  .live::before {
-    content: "";
-    display: inline-block;
-    width: 9px; height: 9px;
-    border-radius: 50%;
-    margin-right: 7px;
-    background: var(--line);
-  }
-  .live.on::before { background: var(--gold); }
-  .live.bad { color: var(--card); font-weight: 600; }
-  .answers .resets { margin-top: 12px; }
-  .pbtns button.remove { width: auto; padding: 10px 14px; border-color: var(--card); color: var(--card); }
-  :root[data-theme="dark"] .live.bad, :root[data-theme="dark"] .pbtns button.remove { color: var(--gold); border-color: var(--gold); }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) .live.bad,
-    :root:not([data-theme="light"]) .pbtns button.remove { color: var(--gold); border-color: var(--gold); }
-  }
-  .resets button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); }
 </style>
 </head>
 <body>
 <main>
-  <header>
-    <h1>Thanksgiving Things</h1>
-    <div class="round" id="roundLabel" aria-live="polite" hidden>Round <b id="roundNum">1</b> of <span id="roundTotal">60</span></div>
-  </header>
 
-  <section class="panel" id="setup" hidden>
-    <h2>Almost ready</h2>
-    <p>This page is not connected to its database yet, so games cannot start. The person who set it up needs to finish that step.</p>
+  <!-- Home: you need a code, not an account -->
+  <section id="home">
+    <h1>Who Said It</h1>
+    <p class="soft lead">Everyone writes a secret answer. Then you guess who wrote what.</p>
+
+    <p id="whoami" class="lead" hidden></p>
+    <div id="homeCards">
+      <div class="card" id="joinCard">
+        <form id="joinForm" autocomplete="off">
+          <label for="codeInput"><strong id="joinHead">Got a code?</strong></label>
+          <input id="codeInput" type="text" inputmode="text" autocapitalize="characters" maxlength="6" placeholder="Game code" aria-describedby="homeMsg">
+          <button class="main" id="joinBtn" type="submit">Join the game</button>
+        </form>
+        <p class="soft small" id="joinNote">No account needed.</p>
+        <p class="msg" id="homeMsg" role="status"></p>
+      </div>
+
+      <!-- Signed out: sign in. Signed in: host a game. -->
+      <div class="card" id="hostCard">
+        <p><strong id="hostHead"></strong></p>
+        <p class="soft small" id="hostLine"></p>
+        <button id="signInBtn" type="button" hidden>Sign in with Google</button>
+        <button id="startBtn" class="main" type="button" hidden>Host a game</button>
+        <p class="soft small" id="homeWait">Getting ready…</p>
+      </div>
+    </div>
+    <button id="signOutBtn" class="quiet" type="button" hidden>Sign out</button>
   </section>
 
-  <section class="panel" id="lobby" hidden>
-    <h2>Join a game</h2>
-    <p>Type the six-character code from the person who started the game.</p>
-    <form class="addrow" id="joinForm">
-      <input id="codeInput" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Game code" aria-label="Game code">
-      <button type="submit" id="joinBtn">Join</button>
-    </form>
-    <h2 class="gap">Start a game</h2>
-    <p>You get a new code to share. Everyone with the code sees and changes the same game, live.</p>
-    <button type="button" class="wide" id="startBtn">Start a new game</button>
-    <p class="msg" id="lobbyMsg" aria-live="polite"></p>
-  </section>
-
-  <div id="game" hidden>
-    <section class="gamebar">
-      <div class="codebox">
-        <span class="codelabel">Game code</span>
-        <b id="codeLabel">------</b>
-      </div>
-      <div class="barbtns">
-        <button type="button" id="inviteBtn">Invite</button>
-        <button type="button" id="leaveBtn">Leave</button>
-      </div>
-      <p class="live" id="status" aria-live="polite">Connecting…</p>
-      <p class="invite" id="inviteLink" hidden></p>
-    </section>
-
-    <section class="card" aria-live="polite">
-      <div class="label">Everyone write an answer</div>
-      <p class="topic" id="topic"></p>
-    </section>
-
-    <section class="answers" id="answers">
-      <h2>Answers from this round <span id="answerCount"></span></h2>
-      <p class="hint">Tap an answer to mark it guessed. Tap again to undo. Every phone sees it.</p>
-      <ul id="answerList"></ul>
-      <form class="addrow" id="answerForm">
-        <input id="answerInput" type="text" maxlength="80" autocomplete="off" placeholder="Add an answer" aria-label="Add an answer">
-        <button type="submit" id="answerAddBtn">Add</button>
-      </form>
-      <div class="resets" id="answerResets" hidden>
-        <button type="button" id="clearAnswersBtn">Clear this round's answers</button>
-      </div>
-    </section>
-
-    <section class="answers" id="roster">
-      <h2>Players this round <span id="rosterCount"></span></h2>
-      <p class="hint" id="rosterHint">Tap a player when their answer is guessed. Everyone is back in on the next round.</p>
-      <ul id="rosterList"></ul>
-    </section>
-
-    <div class="controls">
-      <button type="button" id="prevBtn">Back</button>
-      <button type="button" class="next" id="nextBtn">Next round</button>
+  <!-- In a game -->
+  <section id="play" hidden>
+    <div id="bar">
+      <span id="barLabel"></span>
+      <button id="menuBtn" type="button">Menu</button>
     </div>
 
-    <form class="jump" id="jumpForm">
-      <label for="jumpInput">Go to round</label>
-      <input id="jumpInput" type="number" inputmode="numeric" min="1" max="60" value="1">
-      <button type="submit" id="jumpBtn">Go</button>
-    </form>
-
-    <section class="scores">
-      <h2>Players and scores</h2>
-      <p class="note">Add players in seat order. Anyone in the game can keep score.</p>
-      <ul id="playerList"></ul>
-      <form class="addrow" id="addForm">
-        <input id="nameInput" type="text" maxlength="24" autocomplete="off" placeholder="Player name" aria-label="Player name">
-        <button type="submit" id="addBtn">Add</button>
+    <!-- Name -->
+    <div id="name" hidden>
+      <h1>What's your name tonight?</h1>
+      <p class="soft">Use your real name or a silly one. Tell the room who you are.</p>
+      <p id="midRound" class="banner" hidden>A round is on. You'll play from the next one.</p>
+      <form id="nameForm" autocomplete="off">
+        <input id="nameInput" type="text" maxlength="20" placeholder="Your name" aria-label="Your name" aria-describedby="nameMsg">
+        <button class="main" type="submit">I'm in</button>
+        <button id="sillyBtn" type="button">Give me a silly one</button>
       </form>
-      <div class="resets" id="resets" hidden>
-        <button type="button" id="editBtn" aria-pressed="false">Remove a player</button>
-        <button type="button" id="zeroBtn">Zero the scores</button>
+      <p class="msg" id="nameMsg" role="status"></p>
+      <button id="nameSignIn" class="quiet" type="button" hidden>Already in this game? Sign in with Google</button>
+      <button id="nameHome" class="quiet" type="button">Back to the start</button>
+    </div>
+
+    <!-- Taken out by the host -->
+    <div id="removed" hidden>
+      <h1>You're out of this game</h1>
+      <p class="soft" id="removedLine"></p>
+      <div class="stack">
+        <button class="main" id="rejoinBtn" type="button">Rejoin</button>
+        <button id="homeBtn" type="button">Back to the start</button>
       </div>
-    </section>
+    </div>
 
-    <section class="how">
-      <h2>How to play</h2>
-      <ol>
-        <li>Everyone joins with the game code. Every phone shows the same round, answers and scores.</li>
-        <li>Pick a reader. Everyone, the reader included, secretly writes an answer on paper and hands it in.</li>
-        <li>The reader reads every answer aloud. The player on the reader's left guesses first by picking an answer and naming who wrote it.</li>
-        <li>A right guess scores 1 point, puts that writer out for the round, and earns another guess. A wrong guess passes the turn to the left.</li>
-        <li>The round ends when one writer is left unguessed. That player scores 2 points.</li>
-        <li>The player on the reader's left reads next. Play until everyone has been reader. The top score wins.</li>
-      </ol>
-    </section>
+    <!-- Lobby -->
+    <div id="lobby" hidden>
+      <div id="lobbyHost" hidden>
+        <h1>Get everyone in</h1>
+        <p class="soft" id="lobbyHow"></p>
+        <div class="bigcode" id="bigCode"></div>
+        <canvas class="qr" id="lobbyQr" width="360" height="360" hidden></canvas>
+        <button id="lobbyShareBtn" type="button">Share a link</button>
+      </div>
+      <div id="lobbyGuest" hidden>
+        <h1 id="youreIn"></h1>
+        <p class="soft" id="lobbyWait"></p>
+        <button id="voteLobby" class="quiet" type="button" hidden></button>
+      </div>
+      <h2 id="lobbyCount"></h2>
+      <ul id="lobbyList"></ul>
+      <div id="hostSetup" class="card" hidden>
+        <div class="row">
+          <label class="small soft">Play to
+            <select id="targetSelect"></select>
+          </label>
+          <label class="small soft">Topics
+            <select id="packSelect"></select>
+          </label>
+        </div>
+        <p></p>
+        <button class="main" id="startGameBtn" type="button">Everyone's in, start</button>
+        <p class="soft small" style="text-align:center">Best with 4 or more.</p>
+      </div>
+      <div id="lobbyTeach" class="card" hidden>
+        <p><strong>How it works</strong></p>
+        <ol class="steps howto"></ol>
+      </div>
+    </div>
+
+    <!-- Write -->
+    <div id="write" hidden>
+      <div class="topic" id="topicW"></div>
+      <p id="newTopic" class="banner" hidden></p>
+      <div id="writeMine">
+        <p class="lead">Write one answer. Keep it secret.</p>
+        <form id="answerForm" autocomplete="off">
+          <input id="answerInput" type="text" maxlength="80" placeholder="Type your answer" aria-label="Your answer">
+          <button class="main" id="answerBtn" type="submit">Send it</button>
+        </form>
+      </div>
+      <div id="answered" class="card" hidden>
+        <p class="lead"><strong>It's in. Poker face.</strong></p>
+        <p id="myAnswer" hidden></p>
+        <div class="row">
+          <button id="peekBtn" class="quiet" type="button">Show my answer</button>
+          <button id="editBtn" class="quiet" type="button">Change it</button>
+        </div>
+      </div>
+      <p id="sitOut" class="banner" hidden>You joined mid-round. Watch this one. You're in the next one.</p>
+      <p id="waiting" class="soft"></p>
+      <button id="unstickW" type="button" hidden></button>
+    </div>
+
+    <!-- Guess -->
+    <div id="guess" hidden>
+      <div id="turnBox">
+        <p id="turnHead"></p>
+        <p id="turnLine" class="soft"></p>
+        <p id="triesLine" class="soft small" hidden></p>
+      </div>
+      <p id="stateBanner" class="banner" hidden></p>
+      <p class="soft small" id="topicG"></p>
+      <ul id="answerList"></ul>
+      <button id="passBtn" class="quiet" type="button" hidden>Pass my turn</button>
+      <button id="unstickG" type="button" hidden></button>
+      <p class="soft small" id="hidingLine"></p>
+      <p class="soft small" id="caughtLine"></p>
+      <div id="logBox" hidden>
+        <h2>So far</h2>
+        <ul id="logList"></ul>
+      </div>
+    </div>
+
+    <!-- Game over (sits above the last round) -->
+    <div id="over" hidden>
+      <p id="winnerLine"></p>
+      <p id="overLine" class="soft"></p>
+      <p id="myStats" class="small" hidden></p>
+      <button class="main" id="againBtn" type="button" hidden>Play again, same players</button>
+      <p id="againWait" class="soft" hidden></p>
+    </div>
+
+    <!-- Round over -->
+    <div id="done" hidden>
+      <div id="doneTop">
+        <p id="headline"></p>
+        <p id="underHead" class="lead"></p>
+        <p id="doneNote" class="banner" hidden></p>
+      </div>
+      <div id="hostDone" class="card" hidden>
+        <p class="small soft">Next topic</p>
+        <p id="nextTopic" style="font-weight:700"></p>
+        <div class="row">
+          <button id="swapBtn" type="button">Swap it</button>
+          <button id="ownBtn" type="button">Write my own</button>
+        </div>
+        <form id="ownTopicForm" autocomplete="off" style="margin-top:10px" hidden>
+          <input id="ownTopicInput" type="text" maxlength="120" placeholder="Type your own topic" aria-label="Your own topic">
+          <button type="submit">Use this one</button>
+        </form>
+        <p></p>
+        <button class="main" id="nextBtn" type="button"></button>
+      </div>
+      <p id="doneWait" class="soft" hidden></p>
+      <button id="voteDone" class="quiet" type="button" hidden></button>
+      <div id="gainBox">
+        <h2>This round</h2>
+        <ul id="gainList" class="people"></ul>
+      </div>
+      <h2 id="scoresHead"></h2>
+      <ul id="scores" class="people"></ul>
+      <p id="leaderLine" class="soft small"></p>
+      <h2 id="revealHead">Who said it</h2>
+      <ul id="revealList"></ul>
+    </div>
+  </section>
+
+  <!-- Menu -->
+  <div class="veil" id="menuVeil" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Menu">
+      <div id="menuMain" class="stack">
+        <button id="mInvite" type="button">Let someone in</button>
+        <button id="mHow" type="button">How to play</button>
+        <button id="mScores" type="button">Scores</button>
+        <button id="mSound" type="button"></button>
+        <div id="mHost" class="card stack" hidden>
+          <p class="small soft" style="margin:0">Host</p>
+          <button id="hSkip" type="button" hidden></button>
+          <button id="hGo" type="button" hidden></button>
+          <button id="hTopic" type="button" hidden>Change the topic</button>
+          <button id="hRemove" type="button">Take someone out</button>
+          <button id="hEnd" type="button" hidden>End the game</button>
+        </div>
+        <p id="voteLine" class="soft small" style="margin:0;text-align:center" hidden></p>
+        <button id="mVote" type="button" hidden></button>
+        <button id="mLeave" type="button">Leave the game</button>
+        <button id="mClose" class="quiet" type="button">Close</button>
+      </div>
+      <div id="menuInvite" hidden>
+        <h3>Let someone in</h3>
+        <p class="soft" id="inviteHow"></p>
+        <div class="bigcode" id="inviteCode"></div>
+        <canvas class="qr" id="inviteQr" width="360" height="360" hidden></canvas>
+        <div class="stack">
+          <button class="main" id="inviteShareBtn" type="button">Share a link</button>
+          <button class="quiet menuBack" type="button">Back</button>
+        </div>
+      </div>
+      <div id="menuHow" hidden>
+        <h3>How to play</h3>
+        <ol class="steps howto"></ol>
+        <p></p>
+        <button class="quiet menuBack" type="button">Back</button>
+      </div>
+      <div id="menuScores" hidden>
+        <h3 id="menuScoresHead"></h3>
+        <ul id="scores2" class="people"></ul>
+        <p></p>
+        <button class="quiet menuBack" type="button">Back</button>
+      </div>
+      <div id="menuRemove" hidden>
+        <h3>Take someone out</h3>
+        <ul id="removeList" class="stack"></ul>
+        <p></p>
+        <button class="quiet menuBack" type="button">Back</button>
+      </div>
+      <div id="menuTopic" hidden>
+        <h3>Change the topic</h3>
+        <p class="soft">Answers already sent will be cleared.</p>
+        <div class="stack">
+          <button id="tRandom" type="button">Give us a different one</button>
+          <form id="tOwnForm" autocomplete="off">
+            <input id="tOwnInput" type="text" maxlength="120" placeholder="Type your own topic" aria-label="Your own topic">
+            <button type="submit">Use this one</button>
+          </form>
+          <button class="quiet menuBack" type="button">Keep it</button>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Who wrote this? then: say it out loud -->
+  <div class="veil" id="pickVeil" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Your guess">
+      <div id="pickStep">
+        <h3>Who wrote this?</h3>
+        <p class="quote" id="pickAnswer"></p>
+        <ul id="pickNames"></ul>
+        <p></p>
+        <button class="quiet" id="pickBack" type="button">Go back</button>
+      </div>
+      <div id="confirmStep" hidden>
+        <h3>Say it out loud!</h3>
+        <p class="quote" id="confirmLine"></p>
+        <div class="stack">
+          <button class="main" id="confirmBtn" type="button">That's my guess</button>
+          <button class="quiet" id="confirmBack" type="button">Go back</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- A question with the consequence in its buttons -->
+  <div class="veil" id="askVeil" hidden>
+    <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="askText">
+      <p class="quote" id="askText"></p>
+      <div class="stack">
+        <button class="main" id="askYes" type="button"></button>
+        <button id="askNo" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="moment" role="status" hidden>
+    <div id="momentHead"></div>
+    <div id="momentBody"></div>
+    <div id="momentMore"></div>
+  </div>
+  <div id="toast" role="alert" hidden></div>
 </main>
+
+<script src="qr.js"></script>
 <script>
-(function () {
+/* The page. It is handed three things and touches nothing else:
+     backend  from backend.js (Firebase)
+     game     game.js (the rules)
+     topics   topics.js (the topic packs)
+   Every piece of text a person typed is put on screen with textContent.
+   The game state comes only from the live listener (watchGame), never from
+   the result of this phone's own write. */
+/* The version of the page and its scripts. Change it with every publish that
+   changes index.html, game.js, backend.js or topics.js. Digits only. Phones
+   compare it with the copy on the site and reload themselves when it differs. */
+window.WSI_VERSION = "8";
+window.startWhoSaidIt = function (deps) {
   "use strict";
+  var be = deps.backend, G = deps.game, T = deps.topics;
+  var $ = function (id) { return document.getElementById(id); };
 
-  /* The one setting: the Firebase Realtime Database address. */
-  var DB_URL = String(window.THINGS_DB_URL || "__DB_URL__").replace(/\/+$/, "");
-  var CONFIGURED = /^https:\/\//.test(DB_URL);
+  var me = null;          // { uid, google, name } or null
+  var userKnown = false;  // the first sign-in state has arrived
+  var code = "";          // game this phone is in
+  var s = null;           // that game's state
+  var stopGame = null, stopStats = null;
+  var stats = null;       // { w, g } for a Google user
+  var wasIn = false;      // this phone had a name in this game
+  var rejoining = false;  // taken out, and chose to come back
+  var picked = "";        // answer tapped, waiting for a name
+  var target = "";        // name tapped, waiting for "That's my guess"
+  var editing = false;    // changing an answer already sent
+  var peeking = false;    // looking at an answer already sent
+  var sending = false;    // a move is on its way
+  var nextPick = null;    // host: the topic lined up for the next round
+  var auto = { key: "", at: 0 };   // last move this phone made by itself
+  var crediting = false;  // this finished game is being added to saved wins
+  var outWhy = "";        // why this phone was taken out: "vote" or "host"
+  var toastTimer = 0, momentTimer = 0, wake = null;
+  var coached = {};       // round-1 hints already shown
+  var sound = true;
+  try { sound = localStorage.getItem("wsi-sound") !== "off"; } catch (e) {}
 
-  var TOPICS = [
-    "Things you shouldn't say while carving the turkey.",
-    "Things you shouldn't teach a parrot to say.",
-    "Things that would make a terrible pie filling.",
-    "Things that would be worse if they were twice as big.",
-    "Things you'd rather do than wash the dishes tonight.",
-    "Things a dog thinks about all day.",
-    "Things the turkey was thinking this morning.",
-    "Things you'd find in a wizard's junk drawer.",
-    "Things you shouldn't bring to Thanksgiving dinner.",
-    "Things that should come with a warning label.",
-    "Things you're secretly thankful for.",
-    "Things you shouldn't do in an elevator.",
-    "Things that get said at the kids' table.",
-    "Things you'd buy first after winning the lottery.",
-    "Things you shouldn't do with leftover mashed potatoes.",
-    "Things that sound like a superpower but would be useless.",
-    "Things a pilgrim would find confusing about this dinner.",
-    "Things your phone would say about you.",
-    "Things you'd find under this couch.",
-    "Things you shouldn't yell in a library.",
-    "Things that could ruin a family photo.",
-    "Things that are harder than they look.",
-    "Things you shouldn't say when someone asks for the recipe.",
-    "Things you'd put in a time capsule.",
-    "Things that make you fall asleep after dinner.",
-    "Things a baby would say if babies could talk.",
-    "Things that would improve the Thanksgiving parade.",
-    "Things you shouldn't pack for a camping trip.",
-    "Things you shouldn't put gravy on.",
-    "Things that would make school more fun.",
-    "Things this family argues about every year.",
-    "Things you do when nobody is watching.",
-    "Things you pretend to like to be polite.",
-    "Things you'd ask a talking cat.",
-    "Things Grandma would never allow at the table.",
-    "Things that would be a bad name for a boat.",
-    "Things you'd say to get out of the long drive home.",
-    "Things you shouldn't say on your first day at a new job.",
-    "Things that should be a Thanksgiving tradition.",
-    "Things aliens would find strange about Earth.",
-    "Things you shouldn't whisper during a toast.",
-    "Things you'd never lend to a neighbor.",
-    "Things you'd hide the last slice of pie behind.",
-    "Things that make a road trip feel longer.",
-    "Things that happen when the adults leave the kitchen.",
-    "Things you shouldn't try on roller skates.",
-    "Things a football announcer would say about this dinner.",
-    "Things you'd rename if you were in charge.",
-    "Things you'd do with a fifty-pound turkey.",
-    "Things that belong in a museum about this family.",
-    "Things that smell better than they taste.",
-    "Things you wish came with an undo button.",
-    "Things you shouldn't say to the cook.",
-    "Things a snowman worries about.",
-    "Things you'd trade your dessert for.",
-    "Things you'd say to your ten-year-old self.",
-    "Things that always go missing during the holidays.",
-    "Things you shouldn't say to your dentist.",
-    "Things you'd name a brand-new side dish.",
-    "Things you'll remember about today."
+  var LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  var HOWTO = [
+    "Everyone gets the same topic and writes one secret answer.",
+    "All the answers appear on every phone. Nobody knows who wrote what.",
+    "On your turn, guess who wrote one. Right? You score and go again.",
+    "Get caught and you're out of the guessing for that round. Last one hiding scores 2 extra."
   ];
+  var TARGET_WORDS = { 5: "quick", 10: "regular", 15: "long", 20: "marathon" };
+  var SILLY_A = ["Captain", "Professor", "Sir", "Lady", "Doctor", "Major", "Granny", "Uncle", "Mayor", "Sheriff", "Count", "Agent"];
+  var SILLY_B = ["Pickle", "Waffles", "Noodle", "Biscuit", "Sprinkles", "Meatball", "Pancake", "Wiggles", "Bubbles", "Nugget", "Muffin", "Thunder"];
 
-  var ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  var CODE_RE = /^[A-Z2-9]{6}$/;
-  var CKEY = "things-live-code";
-  var total = TOPICS.length;
-  var code = null;      /* the game this phone is in */
-  var cache = {};       /* this phone's copy of the game */
-  var stream = null;
-  var editing = false;  /* scoreboard shows Remove buttons */
-
-  function $(id) { return document.getElementById(id); }
-  function obj(v) { return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
-
-  /* ---------- database ---------- */
-  function roomUrl(c, path) {
-    return DB_URL + "/rooms/" + c + (path ? "/" + path : "") + ".json";
+  /* ---------- small helpers ---------- */
+  function make(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
   }
-  function request(method, c, path, body) {
-    var opts = { method: method };
-    if (body !== undefined) opts.body = JSON.stringify(body);
-    return fetch(roomUrl(c, path), opts).then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
+  function show(id, on) { $(id).hidden = !on; }
+  function name(uid) { return s && s.players[uid] ? s.players[uid].n : "someone who left"; }
+  function cap(text) { return text.charAt(0).toUpperCase() + text.slice(1); }
+  function hostName() { return s && s.players[s.host] ? s.players[s.host].n : "the host"; }
+  function list(names) {
+    return names.length < 2 ? names.join("") : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+  }
+  function quote(text) { return "“" + text + "”"; }
+  function toast(text) {
+    $("toast").textContent = text; show("toast", true);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { show("toast", false); }, 3500);
+  }
+  function explain(e) {
+    if (e && e.name === "GameError") return e.message;
+    if (e && e.code === "permission-denied") { setTimeout(checkVersion, 0); return "This phone can't do that. Reload the page and try again."; }
+    if (e && /popup/.test(e.code || "")) return "The Google window closed. Try again when you're ready.";
+    return "Can't reach the game. Check your internet and try again.";
+  }
+  function isHost() { return !!(s && me && s.host === me.uid); }
+  function amIn() { return !!(s && me && s.players[me.uid]); }
+  function nextUp() {
+    if (!s || s.phase !== "guess" || s.alive.length < 2) return "";
+    return s.alive[(s.alive.indexOf(s.turn) + 1) % s.alive.length];
+  }
+  function stalled() { return !!s && Date.now() - s.since >= G.RULES.STALL_MS; }
+  function missing() { return s.inRound.filter(function (id) { return s.answers[id] === undefined; }); }
+
+  /* A question whose buttons say what will happen. */
+  var askDone = null;
+  function ask(text, yes, no) {
+    $("askText").textContent = text; $("askYes").textContent = yes; $("askNo").textContent = no;
+    show("askVeil", true);
+    return new Promise(function (resolve) { askDone = resolve; });
+  }
+  function answerAsk(v) { show("askVeil", false); var d = askDone; askDone = null; if (d) d(v); }
+  $("askYes").onclick = function () { answerAsk(true); };
+  $("askNo").onclick = function () { answerAsk(false); };
+
+  /* One move from game.js, applied on the server copy of the game. */
+  function act(move, args, quiet) {
+    if (!me || !code) return Promise.resolve();
+    var uid = me.uid;
+    sending = true; render();
+    return be.act(code, function (state) {
+      return G[move](state, uid, args, Date.now());
+    }).then(function () {
+      sending = false; render();
+    }, function (e) {
+      sending = false; render();
+      if (!quiet) toast(explain(e));
+      throw e;
     });
   }
-  function setAt(path, value) {
-    var parts = String(path).split("/").filter(Boolean);
-    for (var k = 0; k < parts.length; k++) {
-      if (parts[k] === "__proto__" || parts[k] === "constructor" || parts[k] === "prototype") return;
-    }
-    if (!parts.length) { cache = obj(value); return; }
-    var node = cache;
-    for (var i = 0; i < parts.length - 1; i++) {
-      if (!node[parts[i]] || typeof node[parts[i]] !== "object") node[parts[i]] = {};
-      node = node[parts[i]];
-    }
-    var leaf = parts[parts.length - 1];
-    if (value === null || value === undefined) delete node[leaf]; else node[leaf] = value;
-  }
-  /* JSON with sorted keys, so two copies of the same value compare equal. */
-  function canon(v) {
-    if (v === undefined) v = null;
-    if (v && typeof v === "object" && !Array.isArray(v)) {
-      return "{" + Object.keys(v).sort().map(function (k) {
-        return JSON.stringify(k) + ":" + canon(v[k]);
-      }).join(",") + "}";
-    }
-    if (Array.isArray(v)) return "[" + v.map(canon).join(",") + "]";
-    return JSON.stringify(v);
-  }
+  function quietly(p) { p.catch(function () {}); }
 
-  /* Changes this phone has sent that the database has not echoed back yet:
-     { path: [{ v: canonical JSON, t: time sent }] }. While a path has one,
-     older values arriving for it are skipped, so quick taps are never undone. */
-  var pending = {};
-  var sweepTimer = null;
-
-  function dropPending(path, json) {
-    var q = pending[path];
-    if (!q) return;
-    for (var i = 0; i < q.length; i++) {
-      if (q[i].v === json) { q.splice(i, 1); break; }
-    }
-    if (!q.length) delete pending[path];
-  }
-  function sweep() {
-    sweepTimer = null;
-    var now = Date.now(), stale = false, left = false;
-    Object.keys(pending).forEach(function (p) {
-      pending[p] = pending[p].filter(function (e) {
-        if (now - e.t > 5000) { stale = true; return false; }
-        return true;
-      });
-      if (pending[p].length) left = true; else delete pending[p];
-    });
-    if (stale) resync();
-    if (left) sweepTimer = setTimeout(sweep, 2000);
-  }
-  /* Fetch the whole game again and take it as the truth. */
-  function resync() {
-    if (!code) return;
-    var mine = code;
-    request("GET", mine, "").then(function (data) {
-      if (code !== mine) return;
-      incoming("", data);
-      render();
-    }, function () {});
-  }
-
-  /* Change this phone first, then tell the database, which tells everyone. */
-  function write(path, value) {
-    if (!code) return;
-    if (value === undefined) value = null;
-    setAt(path, value);
-    render();
-    var json = canon(value);
-    (pending[path] = pending[path] || []).push({ v: json, t: Date.now() });
-    if (!sweepTimer) sweepTimer = setTimeout(sweep, 2000);
-    request("PUT", code, path, value).catch(function () {
-      dropPending(path, json);
-      setStatus("Could not save that change. Check the connection.", "bad");
-      resync();
+  /* A player's own name and answer are checked here against the game as this
+     phone sees it, then written as single fields (see backend.js put). */
+  function putMine(move, args, field) {
+    var uid = me.uid, next;
+    try { next = G[move](s, uid, args, Date.now()); } catch (e) { return Promise.reject(e); }
+    var fields = [[field, uid], next[field][uid]];
+    if (field === "answers") fields.push(["since"], Date.now());
+    sending = true; render();
+    return be.put(code, fields).then(function () {
+      sending = false; render();
+    }, function (e) {
+      sending = false; render();
+      throw e;
     });
   }
 
-  /* Take a value the database sent. */
-  function incoming(path, data) {
-    path = String(path).split("/").filter(Boolean).join("/");
-    var q = pending[path];
-    if (q && q.length) {
-      if (canon(data) === q[0].v) q.shift();
-      if (q.length) return;            /* a newer change from this phone is on its way */
-      delete pending[path];
-      setAt(path, data);
-      return;
+  /* ---------- your-turn signal and keeping the screen on ---------- */
+  var audio = null;
+  function buzz() {
+    if (!sound) return;
+    try { if (navigator.vibrate) navigator.vibrate([120, 80, 120]); } catch (e) {}
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audio = audio || new Ctx();
+      if (audio.state === "suspended" && audio.resume) audio.resume();
+      var o = audio.createOscillator(), g = audio.createGain();
+      o.type = "sine"; o.frequency.value = 660;
+      g.gain.setValueAtTime(0.0001, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.2, audio.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.35);
+      o.connect(g); g.connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + 0.4);
+    } catch (e) {}
+  }
+  function stayAwake() {
+    try {
+      if (!code || !navigator.wakeLock || document.visibilityState !== "visible") return;
+      navigator.wakeLock.request("screen").then(function (w) { wake = w; }, function () {});
+    } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", stayAwake);
+
+  /* ---------- a result fills the screen for about three seconds ---------- */
+  function moment(kind, head, body, more) {
+    $("moment").className = kind || "";
+    $("momentHead").textContent = head; $("momentBody").textContent = body || ""; $("momentMore").textContent = more || "";
+    show("moment", true);
+    clearTimeout(momentTimer);
+    momentTimer = setTimeout(function () { show("moment", false); }, 3200);
+  }
+  $("moment").onclick = function () { clearTimeout(momentTimer); show("moment", false); };
+
+  function coach(key, text) {
+    if (s.round !== 1 || coached[key]) return "";
+    coached[key] = true;
+    return text;
+  }
+  /* Called with the state before and after a change. */
+  function announce(old, now) {
+    if (!old || !amIn()) return;
+    var uid = me.uid, more = [];
+    if (now.phase === "guess" && now.allowed > old.allowed && old.phase === "guess") {
+      more.push(now.allowed === 2 ? "Second chances! Everyone gets 2 tries a turn now." : "Third chances! Everyone gets 3 tries a turn now.");
     }
-    setAt(path, data);
-    /* Changes this phone made underneath this path are newer: keep them. */
-    var prefix = path ? path + "/" : "";
-    Object.keys(pending).forEach(function (p) {
-      var pq = pending[p];
-      if (p !== path && p.indexOf(prefix) === 0 && pq.length) {
-        setAt(p, JSON.parse(pq[pq.length - 1].v));
+    if (old.phase === "write" && now.phase === "guess" && now.round === old.round) {
+      /* writing has closed: flash, then every answer is on the screen */
+      var everyone = now.inRound.every(function (id) { return now.answers[id] !== undefined; });
+      moment("", "Time to guess!", everyone ? "Everyone's in." : "",
+        now.turn === uid ? "You go first. Read the answers out loud, then pick one." : name(now.turn) + " goes first.");
+    } else if (now.seq !== old.seq && now.last) {
+      var L = now.last, ended = now.phase === "done" || now.phase === "over";
+      var up = !ended && now.turn && now.turn !== old.turn ? (now.turn === uid ? "You're up." : name(now.turn) + " is up.") : "";
+      if (L.kind === "guess") {
+        var text = now.answers[L.answer] || "", who = name(L.target), by = name(L.by);
+        if (L.ok) {
+          if (L.by === uid) more.unshift(ended ? "" : coach("right", "Right means you go again."));
+          else if (L.target !== uid) more.unshift(coach("caught", "Caught players watch until the next round."));
+          if (L.by === uid) moment("ok", "Yes!", "You caught " + who + ". +1." + (ended ? "" : " Go again."), more.filter(Boolean).join(" "));
+          else if (L.target === uid) moment("no", "Caught!", by + " found your answer.", "You're out of the guessing this round.");
+          else moment("ok", "Caught!", by + " caught " + who + ". " + quote(text), more.filter(Boolean).join(" "));
+        } else {
+          more.unshift(up, coach("wrong", "Wrong means the next person goes."));
+          if (L.by === uid) moment("no", "Nope.", who + " didn't write that.", more.filter(Boolean).join(" "));
+          else if (L.target === uid) moment("ok", "Safe!", by + " thought you wrote " + quote(text) + ".", more.filter(Boolean).join(" "));
+          else moment("no", "Nope!", by + " guessed " + who + " for " + quote(text) + ".", more.filter(Boolean).join(" "));
+        }
+      } else if (L.kind === "pass") {
+        more.unshift(up);
+        if (L.target === L.by) moment("", L.by === uid ? "You passed." : name(L.by) + " passed.", "", more.filter(Boolean).join(" "));
+        else moment("", name(L.target) + " moved things along.", "", more.filter(Boolean).join(" "));
+      } else if (L.kind === "host") {
+        moment("", L.by === uid ? "You're the host now." : name(L.by) + " is the host now.", "The players voted. " + L.answer + " is out of the game.", "");
+      } else if (L.kind === "left") {
+        moment("", L.answer + " left the game.", ended ? "" : "Their answer stays as a decoy.", "");
       }
-    });
-  }
-  function newId() {
-    var t = Date.now().toString(36);
-    while (t.length < 9) t = "0" + t;
-    return t + randomChars(6);
-  }
-  function randomChars(n) {
-    var out = "", buf = new Uint32Array(n);
-    try { crypto.getRandomValues(buf); } catch (e) {
-      for (var j = 0; j < n; j++) buf[j] = Math.floor(Math.random() * 4294967296);
+    } else if (more.length) moment("", more[0], "", "");
+    /* the phone it concerns gets a buzz */
+    if (now.phase === "guess" && now.turn === uid && (old.turn !== uid || old.phase !== "guess")) buzz();
+    if (now.phase === "write" && old.phase === "write" && now.round === old.round && now.topic !== old.topic) {
+      $("newTopic").textContent = "New topic! " + (now.players[now.host] ? now.players[now.host].n : "The host") + " swapped it." + (old.answers[uid] !== undefined ? " Write a new answer." : "");
+      show("newTopic", true); editing = false; peeking = false;
     }
-    for (var i = 0; i < n; i++) out += ALPHABET.charAt(buf[i] % ALPHABET.length);
-    return out;
+    if (now.round !== old.round) { show("newTopic", false); editing = false; peeking = false; nextPick = null; show("ownTopicForm", false); }
   }
 
-  function setStatus(text, kind) {
-    var el = $("status");
-    el.textContent = text;
-    el.className = "live" + (kind ? " " + kind : "");
-  }
-
-  function openStream() {
-    closeStream();
-    if (typeof EventSource !== "function") {
-      setStatus("This browser cannot receive live updates.", "bad");
-      return;
-    }
-    var mine = code;
-    stream = new EventSource(roomUrl(code, ""));
-    stream.onopen = function () { if (code === mine) setStatus("Live", "on"); };
-    stream.onerror = function () { if (code === mine) setStatus("Reconnecting…", ""); };
-    stream.addEventListener("put", function (e) {
-      if (code !== mine) return;
-      var d = JSON.parse(e.data);
-      incoming(d.path, d.data);
-      setStatus("Live", "on");
-      render();
-    });
-    stream.addEventListener("patch", function (e) {
-      if (code !== mine) return;
-      var d = JSON.parse(e.data), data = obj(d.data);
-      Object.keys(data).forEach(function (k) { incoming(d.path + "/" + k, data[k]); });
-      setStatus("Live", "on");
-      render();
-    });
-    stream.addEventListener("cancel", function () {
-      if (code === mine) setStatus("The database refused this game code.", "bad");
-    });
-  }
-  function closeStream() {
-    if (stream) { try { stream.close(); } catch (e) {} stream = null; }
-  }
-
-  /* ---------- lobby ---------- */
-  function showView(name) {
-    $("setup").hidden = name !== "setup";
-    $("lobby").hidden = name !== "lobby";
-    $("game").hidden = name !== "game";
-    $("roundLabel").hidden = name !== "game";
-  }
-  function lobbyMsg(t) { $("lobbyMsg").textContent = t; }
-
-  function enter(c, data) {
-    code = c;
-    cache = obj(data);
-    pending = {};
-    try { localStorage.setItem(CKEY, c); } catch (e) {}
-    try { history.replaceState(null, "", "#" + c); } catch (e) { location.hash = c; }
-    $("codeLabel").textContent = c;
-    $("inviteLink").hidden = true;
-    editing = false;
-    setStatus("Connecting…", "");
-    showView("game");
+  /* ---------- sign-in ---------- */
+  be.onUser(function (u) {
+    var changed = userKnown && ((u && u.uid) !== (me && me.uid));
+    me = u; userKnown = true;
+    if (stopStats) { stopStats(); stopStats = null; }
+    stats = null;
+    if (me && me.google) stopStats = be.watchStats(me.uid, function (d) { stats = d; render(); });
+    if (changed && !me) leave();
     render();
-    openStream();
+  });
+  $("signInBtn").onclick = function () { be.signInGoogle().catch(function (e) { $("homeMsg").textContent = explain(e); }); };
+  $("signOutBtn").onclick = function () { leave(); be.signOut(); };
+
+  /* ---------- joining and starting ---------- */
+  function usable(g) { return !!g && typeof g.seq === "number" && Array.isArray(g.votes); }   // games from before this version are over
+  function open(c) {
+    $("homeMsg").textContent = "";
+    return be.signInGuest().then(function () { return be.getGame(c); }).then(function (g) {
+      if (!g) { $("homeMsg").textContent = "Can't find game " + c + ". Check the code with your host."; return; }
+      if (!usable(g)) { $("homeMsg").textContent = "That game has ended."; return; }
+      if (stopGame) stopGame();
+      code = c; s = g; picked = ""; target = ""; editing = false; rejoining = false; coached = {}; outWhy = ""; crediting = false;
+      wasIn = amIn();
+      try { history.replaceState(null, "", "#" + c); } catch (e) { location.hash = c; }
+      try { localStorage.setItem("wsi-code", c); } catch (e) {}
+      listen(c);
+      stayAwake();
+      render();
+    }).catch(function (e) { $("homeMsg").textContent = explain(e); });
+  }
+  /* Firestore ends a listener when it reports an error, so start a new one. */
+  function listen(c) {
+    if (stopGame) stopGame();
+    stopGame = be.watchGame(c, function (data) {
+      if (code !== c) return;
+      if (!usable(data)) { leave(); $("homeMsg").textContent = "That game has ended."; return; }
+      var old = s, had = amIn();
+      s = data;
+      if (amIn()) { wasIn = true; rejoining = false; outWhy = ""; }
+      else if (had) outWhy = s.last && s.last.kind === "host" && s.seq !== old.seq ? "vote" : "host";
+      announce(old, s);
+      render();
+    }, function () {
+      if (code !== c) return;
+      toast("Lost the connection. Trying again…");
+      setTimeout(function () { if (code === c) listen(c); }, 3000);
+    });
   }
   function leave() {
-    closeStream();
-    code = null;
-    cache = {};
-    pending = {};
-    try { localStorage.removeItem(CKEY); } catch (e) {}
-    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
-    lobbyMsg("");
-    showView("lobby");
+    if (stopGame) { stopGame(); stopGame = null; }
+    code = ""; s = null; picked = ""; target = ""; editing = false; wasIn = false; outWhy = ""; crediting = false;
+    closeSheets();
+    try { if (wake) wake.release(); } catch (e) {}
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; }
+    try { localStorage.removeItem("wsi-code"); } catch (e) {}
+    render();
   }
-  function join(c, quiet) {
-    c = String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (!CODE_RE.test(c)) {
-      if (!quiet) lobbyMsg("A game code has six letters and numbers.");
-      return;
+  function newCode() {
+    var c = "";
+    for (var i = 0; i < 6; i++) c += LETTERS.charAt(Math.floor(Math.random() * LETTERS.length));
+    return c;
+  }
+  function create(tries) {
+    var c = newCode();
+    return be.getGame(c).then(function (g) {
+      if (g) { if (tries > 5) throw new Error("no code"); return create(tries + 1); }
+      return be.createGame(c, G.newGame(me.uid)).then(function () { return open(c); });
+    });
+  }
+
+  $("joinForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var c = $("codeInput").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (!/^[A-Z2-9]{6}$/.test(c)) { $("homeMsg").textContent = "A game code is six letters and numbers."; return; }
+    open(c);
+  };
+  /* Hosting needs a Google sign-in; signing in does not start a game. */
+  $("startBtn").onclick = function () {
+    if (!me || !me.google) return;
+    $("startBtn").disabled = true;
+    create(0).catch(function (e) { $("homeMsg").textContent = explain(e); }).then(function () { $("startBtn").disabled = false; render(); });
+  };
+
+  function link() { return location.origin + location.pathname + "#" + code; }
+  function share() {
+    if (navigator.share) {
+      navigator.share({ title: "Who Said It", text: "Join our game of Who Said It. The code is " + code + ".", url: link() }).catch(function () {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(link()).then(function () { toast("Link copied."); }, function () { toast(link()); });
+    } else toast(link());
+  }
+  function drawQr(id) {
+    var c = $(id);
+    try {
+      var q = window.qrcode(0, "M"); q.addData(link()); q.make();
+      var n = q.getModuleCount(), pad = 2, size = Math.floor(c.width / (n + pad * 2)), ctx = c.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.fillStyle = "#000";
+      var off = Math.floor((c.width - size * n) / 2);
+      for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) ctx.fillRect(off + k * size, off + r * size, size, size);
+      c.hidden = false;
+    } catch (e) { c.hidden = true; }
+  }
+  $("lobbyShareBtn").onclick = share;
+  $("inviteShareBtn").onclick = share;
+
+  $("nameForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    $("nameMsg").textContent = "";
+    putMine("join", { name: $("nameInput").value }, "players").catch(function (e) { $("nameMsg").textContent = explain(e); });
+  };
+  $("sillyBtn").onclick = function () {
+    var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
+    $("nameInput").value = pick(SILLY_A) + " " + pick(SILLY_B);
+  };
+  /* A host or signed-in player who lands here as a guest gets their place back. */
+  $("nameSignIn").onclick = function () { be.signInGoogle().catch(function (e) { $("nameMsg").textContent = explain(e); }); };
+  $("nameHome").onclick = leave;
+  $("rejoinBtn").onclick = function () { rejoining = true; render(); };
+  $("homeBtn").onclick = leave;
+
+  /* ---------- host setup ---------- */
+  G.RULES.TARGETS.forEach(function (n) {
+    var o = make("option", "", n + " · " + TARGET_WORDS[n]); o.value = String(n); $("targetSelect").appendChild(o);
+  });
+  Object.keys(T.PACKS).forEach(function (k) {
+    var o = make("option", "", T.PACKS[k].label); o.value = k; $("packSelect").appendChild(o);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".howto"), function (ol) {
+    HOWTO.forEach(function (line) { ol.appendChild(make("li", "", line)); });
+  });
+  $("targetSelect").onchange = function () { quietly(act("setup", { target: Number($("targetSelect").value) })); };
+  $("packSelect").onchange = function () { quietly(act("setup", { pack: $("packSelect").value })); };
+
+  function freshTopic() { return T.pickTopic(s.pack, s.used); }
+  $("startGameBtn").onclick = function () { quietly(act("startRound", freshTopic())); };
+  $("nextBtn").onclick = function () { quietly(act("startRound", nextPick || freshTopic())); };
+  $("swapBtn").onclick = function () {
+    nextPick = T.pickTopic(s.pack, nextPick && nextPick.index >= 0 ? s.used.concat([nextPick.index]) : s.used);
+    render();
+  };
+  $("ownBtn").onclick = function () { show("ownTopicForm", true); $("ownTopicInput").focus(); };
+  $("ownTopicForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var text = $("ownTopicInput").value.replace(/\s+/g, " ").trim();
+    if (!text) return;
+    nextPick = { topic: text, index: -1 }; $("ownTopicInput").value = ""; show("ownTopicForm", false); render();
+  };
+  $("againBtn").onclick = function () { quietly(act("playAgain")); };
+
+  /* ---------- writing ---------- */
+  $("answerForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    putMine("submit", { text: $("answerInput").value }, "answers").then(function () {
+      editing = false; peeking = false; $("answerInput").value = ""; show("newTopic", false); render();
+      quietly(act("allIn", null, true));   // starts the guessing if this was the last answer
+    }, function (e) {
+      toast(e && e.code === "permission-denied" ? "Answers are closed for this round." : explain(e));
+    });
+  };
+  $("editBtn").onclick = function () {
+    editing = true; $("answerInput").value = s.answers[me.uid] || ""; render(); $("answerInput").focus();
+  };
+  $("peekBtn").onclick = function () { peeking = !peeking; render(); };
+  function startWithout() {
+    var names = missing().map(name);
+    ask("Start without " + list(names) + "? They'll watch this round.", "Start", "Wait").then(function (yes) {
+      if (yes) quietly(act("closeWriting"));
+    });
+  }
+  $("unstickW").onclick = startWithout;
+
+  /* ---------- guessing ---------- */
+  function closePick() { picked = ""; target = ""; show("pickVeil", false); }
+  $("pickBack").onclick = function () { closePick(); render(); };
+  $("confirmBack").onclick = function () { target = ""; render(); };
+  $("confirmBtn").onclick = function () {
+    var args = { answer: picked, target: target };
+    closePick();
+    quietly(act("guess", args));
+  };
+  $("passBtn").onclick = function () {
+    var turn = s.turn;
+    ask("Pass your turn?", "Pass", "Keep guessing").then(function (yes) { if (yes) quietly(act("pass", { turn: turn })); });
+  };
+  $("unstickG").onclick = function () { quietly(act("pass", { turn: s.turn })); };
+
+  /* ---------- menu ---------- */
+  var PANELS = ["menuMain", "menuInvite", "menuHow", "menuScores", "menuRemove", "menuTopic"];
+  function panel(id) { PANELS.forEach(function (p) { show(p, p === id); }); }
+  function closeSheets() { show("menuVeil", false); show("pickVeil", false); if (askDone) answerAsk(false); }
+  $("menuBtn").onclick = function () { panel("menuMain"); show("menuVeil", true); render(); };
+  $("mClose").onclick = function () { show("menuVeil", false); };
+  $("menuVeil").onclick = function (ev) { if (ev.target === $("menuVeil")) show("menuVeil", false); };
+  Array.prototype.forEach.call(document.querySelectorAll(".menuBack"), function (b) { b.onclick = function () { panel("menuMain"); }; });
+  $("mInvite").onclick = function () { panel("menuInvite"); drawQr("inviteQr"); };
+  $("mHow").onclick = function () { panel("menuHow"); };
+  $("mScores").onclick = function () { panel("menuScores"); };
+  $("mSound").onclick = function () {
+    sound = !sound;
+    try { localStorage.setItem("wsi-sound", sound ? "on" : "off"); } catch (e) {}
+    if (sound) buzz();
+    render();
+  };
+  $("mLeave").onclick = function () {
+    show("menuVeil", false);
+    ask("Leave the game? You can come back with the same code on this phone.", "Leave", "Stay").then(function (yes) { if (yes) leave(); });
+  };
+  /* Any player but the host: vote for a new host, or take the vote back. */
+  function voteNew() {
+    show("menuVeil", false);
+    var host = s.host;   // the host this vote is about, even if the answer comes later
+    if (s.votes.indexOf(me.uid) >= 0) { quietly(act("voteHost", { on: false, host: host })); return; }
+    var need = G.votesNeeded(s), heir = G.seats(s).filter(function (id) { return id !== s.host; })[0];
+    ask("Vote for a new host? It takes " + need + (need === 1 ? " vote. " : " votes. ") + hostName() + " would be taken out of the game and " +
+      (heir === me.uid ? "you" : name(heir)) + " would become host.", "Vote", "Never mind").then(function (yes) {
+      if (yes) quietly(act("voteHost", { on: true, host: host }));
+    });
+  }
+  $("mVote").onclick = voteNew; $("voteDone").onclick = voteNew; $("voteLobby").onclick = voteNew;
+  $("hSkip").onclick = function () { show("menuVeil", false); quietly(act("pass", { turn: s.turn })); };
+  $("hGo").onclick = function () { show("menuVeil", false); startWithout(); };
+  $("hTopic").onclick = function () { panel("menuTopic"); };
+  $("tRandom").onclick = function () { show("menuVeil", false); quietly(act("changeTopic", freshTopic())); };
+  $("tOwnForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var text = $("tOwnInput").value;
+    show("menuVeil", false);
+    quietly(act("changeTopic", { topic: text, index: -1 }).then(function () { $("tOwnInput").value = ""; }));
+  };
+  $("hRemove").onclick = function () { panel("menuRemove"); };
+  $("hEnd").onclick = function () {
+    show("menuVeil", false);
+    ask("End the game now? Whoever is ahead wins.", "End it", "Keep playing").then(function (yes) { if (yes) quietly(act("finish")); });
+  };
+
+  /* ---------- things phones do by themselves ---------- */
+  function once(key, wait, fn) {
+    if (auto.key === key && Date.now() - auto.at < wait) return;
+    auto = { key: key, at: Date.now() };
+    quietly(fn());
+  }
+  function tick() {
+    if (!s || !me) return;
+    if (!amIn() || sending) return;
+    if (s.phase === "write" && s.inRound.length && !missing().length) {
+      once("allin" + s.round, 4000, function () { return act("allIn", null, true); });
+    } else if (s.votes.indexOf(me.uid) >= 0 && s.votes.length >= G.votesNeeded(s)) {
+      /* players leaving made the votes enough: a voter's phone completes it */
+      once("votes" + s.seq, 4000, function () { return act("voteHost", { on: true, host: s.host }, true); });
     }
-    lobbyMsg("Looking for game " + c + "…");
-    request("GET", c, "").then(function (data) {
-      if (data === null) {
-        try { localStorage.removeItem(CKEY); } catch (e) {}
-        lobbyMsg("No game has the code " + c + ". Check it and try again.");
-        return;
-      }
-      lobbyMsg("");
-      enter(c, data);
-    }, function () {
-      lobbyMsg("Could not reach the game. Check the connection and try again.");
-    });
+    if (s.phase === "over") creditMe();   // again here, in case the first try failed
+    /* the safety-net buttons appear without anything else changing */
+    if ((s.phase === "write" || s.phase === "guess") && stalled() !== tick.wasStalled) { tick.wasStalled = stalled(); render(); }
   }
-  function start(tries) {
-    var c = randomChars(6);
-    lobbyMsg("Starting a game…");
-    request("GET", c, "").then(function (data) {
-      if (data !== null) {
-        if (tries > 4) throw new Error("no free code");
-        return start(tries + 1);
-      }
-      var fresh = { created: Date.now(), round: 1 };
-      return request("PUT", c, "", fresh).then(function () {
-        lobbyMsg("");
-        enter(c, fresh);
-      });
-    }).catch(function () {
-      lobbyMsg("Could not start a game. Check the connection and try again.");
+  setInterval(tick, 250);
+
+  /* ---------- drawing ---------- */
+  function person(id, score) {
+    var li = make("li", id === me.uid ? "me" : "");
+    li.appendChild(make("span", "pname", s.players[id].n + (id === s.host ? " (host)" : "") + (id === me.uid ? " (you)" : "")));
+    if (score !== undefined) li.appendChild(make("span", "pscore", score));
+    return li;
+  }
+  function drawScores(id) {
+    var box = $(id); box.textContent = "";
+    var ids = G.seats(s), top = 0;
+    ids.forEach(function (p) { top = Math.max(top, s.players[p].s); });
+    ids.sort(function (a, b) { return s.players[b].s - s.players[a].s; });
+    ids.forEach(function (p) {
+      var li = person(p, String(s.players[p].s));
+      if (top > 0 && s.players[p].s === top) li.className += " top";
+      box.appendChild(li);
     });
   }
 
-  /* ---------- game ---------- */
-  function curRound() {
-    var n = parseInt(cache.round, 10);
-    return isNaN(n) ? 1 : Math.min(total, Math.max(1, n));
+  function drawLobby() {
+    var host = isHost(), n = Object.keys(s.players).length;
+    show("lobbyHost", host); show("lobbyGuest", !host); show("hostSetup", host); show("lobbyTeach", !host);
+    $("bigCode").textContent = code;
+    $("lobbyHow").textContent = "Scan this, or type the code at " + location.host + ".";
+    if (host && $("lobbyQr").dataset.code !== code) { $("lobbyQr").dataset.code = code; drawQr("lobbyQr"); }
+    $("youreIn").textContent = "You're in, " + name(me.uid) + ".";
+    $("lobbyWait").textContent = "Waiting for " + hostName() + " to start.";
+    $("lobbyCount").textContent = "In so far (" + n + ")";
+    var box = $("lobbyList"); box.textContent = "";
+    G.seats(s).forEach(function (id) { box.appendChild(person(id)); });
+    if (!sending) { $("targetSelect").value = String(s.target); $("packSelect").value = s.pack; }
+    var enough = n >= G.RULES.MIN_PLAYERS;
+    $("startGameBtn").disabled = !enough || sending;
+    $("startGameBtn").textContent = enough ? "Everyone's in, start" : "Waiting for one more player";
   }
-  function sortedKeys(o) { return Object.keys(o).sort(); }
 
-  function chips(ul, items, onTap) {
-    ul.textContent = "";
-    items.forEach(function (it) {
-      var li = document.createElement("li");
-      var b = document.createElement("button");
+  function drawWrite() {
+    var mine = s.answers[me.uid], playing = s.inRound.indexOf(me.uid) >= 0;
+    $("topicW").textContent = s.topic;
+    show("writeMine", playing && (mine === undefined || editing));
+    show("answered", playing && mine !== undefined && !editing);
+    show("sitOut", !playing);
+    show("myAnswer", peeking);
+    $("myAnswer").textContent = mine === undefined ? "" : quote(mine);
+    $("peekBtn").textContent = peeking ? "Hide my answer" : "Show my answer";
+    $("answerBtn").textContent = editing ? "Send the new one" : "Send it";
+    $("answerBtn").disabled = sending;
+    var all = missing(), others = all.filter(function (id) { return id !== me.uid; });
+    var inCount = s.inRound.length - all.length;
+    $("waiting").textContent = !all.length ? "Everyone's in!" :
+      others.length > 4 ? inCount + " of " + s.inRound.length + " are in." :
+      others.length ? "Waiting for " + list(others.map(name)) + "." : "";
+    /* nothing for two minutes: every player gets the button the host has in the menu */
+    var stuck = stalled() && all.length > 0 && inCount >= 1;
+    show("unstickW", stuck);
+    if (stuck) $("unstickW").textContent = "Start without " + list(all.map(name));
+  }
+
+  function drawGuess() {
+    var uid = me.uid, myTurn = s.turn === uid, playing = s.inRound.indexOf(uid) >= 0 && s.answers[uid] !== undefined;
+    var caught = playing && s.alive.indexOf(uid) < 0, up = nextUp();
+    if (!myTurn || s.shuffle.indexOf(picked) < 0 || s.found[picked]) { picked = ""; target = ""; }
+    if (target && s.alive.indexOf(target) < 0) target = "";
+
+    $("turnBox").className = myTurn ? "mine" : "";
+    $("turnHead").textContent = myTurn ? "Your turn, " + name(uid) : name(s.turn) + " is guessing";
+    $("turnLine").textContent = myTurn ? "Pick an answer. Who wrote it?" :
+      up === uid ? "You're up next." : up && up !== s.turn ? "Up next: " + name(up) : "";
+    var tries = s.allowed - s.misses;
+    show("triesLine", s.allowed > 1);
+    $("triesLine").textContent = myTurn
+      ? (s.misses ? tries + " more " + (tries === 1 ? "try." : "tries.") : "You get " + s.allowed + " tries this turn.")
+      : "Everyone gets " + s.allowed + " tries a turn now.";
+    show("stateBanner", caught || !playing);
+    $("stateBanner").textContent = caught ? "You're caught. Watch who's next." : "You're watching this round.";
+    $("topicG").textContent = s.topic;
+
+    var who = G.authors(s), catcher = {};
+    s.log.forEach(function (e) { if (e.ok) catcher[e.answer] = e.by; });
+    var box = $("answerList"); box.textContent = "";
+    s.shuffle.forEach(function (a) {
+      var li = make("li"), b = make("button");
       b.type = "button";
-      b.textContent = it.text;
-      b.setAttribute("aria-pressed", it.on ? "true" : "false");
-      b.addEventListener("click", function () { onTap(it); });
-      li.appendChild(b);
-      ul.appendChild(li);
+      b.appendChild(make("span", "text", s.answers[a]));
+      if (who[a] !== undefined) {
+        b.className = "found"; b.disabled = true;
+        b.appendChild(make("span", "tag", name(who[a]) + ", caught by " + name(catcher[a])));
+      } else {
+        b.onclick = function () {
+          if (s.turn !== uid) { toast("Hang on, it's " + name(s.turn) + "'s turn."); return; }
+          picked = a; target = ""; render();
+        };
+      }
+      li.appendChild(b); box.appendChild(li);
     });
+
+    show("passBtn", myTurn);
+    var stuck = !myTurn && !isHost() && stalled();
+    show("unstickG", stuck);
+    if (stuck) $("unstickG").textContent = "Skip " + name(s.turn) + "'s turn";
+
+    var out = s.inRound.filter(function (id) { return s.answers[id] !== undefined && s.players[id] && s.alive.indexOf(id) < 0; });
+    $("hidingLine").textContent = "Still hiding (" + s.alive.length + "): " + list(s.alive.map(name));
+    $("caughtLine").textContent = out.length ? "Caught (" + out.length + "): " + list(out.map(name)) : "";
+
+    var log = $("logList"); log.textContent = "";
+    show("logBox", s.log.length > 0);
+    s.log.slice(-5).reverse().forEach(function (e) {
+      var text = quote(s.answers[e.answer] || "");
+      log.appendChild(make("li", "", e.ok ? name(e.by) + " caught " + name(e.target) + ": " + text
+        : name(e.by) + " guessed " + name(e.target) + " for " + text + ". Nope."));
+    });
+
+    /* the panel: who wrote this, then say it out loud */
+    show("pickVeil", myTurn && !!picked);
+    if (myTurn && picked) {
+      show("pickStep", !target); show("confirmStep", !!target);
+      $("pickAnswer").textContent = quote(s.answers[picked]);
+      var names = $("pickNames"); names.textContent = "";
+      s.alive.forEach(function (id) {
+        if (id === uid) return;
+        var li = make("li"), b = make("button", "", s.players[id].n);
+        b.type = "button";
+        b.onclick = function () { target = id; render(); };
+        li.appendChild(b); names.appendChild(li);
+      });
+      if (target) $("confirmLine").textContent = name(target) + " wrote " + quote(s.answers[picked]);
+      $("confirmBtn").disabled = sending;
+    }
+  }
+
+  function drawDone() {
+    var over = s.phase === "over", last = s.alive.length === 1 ? s.alive[0] : "";
+    show("doneTop", !over); show("hostDone", !over && isHost()); show("doneWait", !over && !isHost());
+    $("headline").textContent = s.note === "few" ? "No round this time" :
+      last === me.uid ? "Nobody caught you, " + name(last) + "!" : last ? name(last) + " was never caught!" : "Round over";
+    $("underHead").textContent = last ? "Last one hiding: +" + G.RULES.BONUS : "";
+    var note = s.note === "few" ? "Not enough answers that time. No points. Let's try another topic." : "";
+    if (s.note === "tie") {
+      var top = G.leaders(s);
+      note = list(top.map(name)) + " are tied on " + s.players[top[0]].s + ". One more round to settle it!";
+    }
+    show("doneNote", !!note); $("doneNote").textContent = note;
+
+    if (!over && isHost()) {
+      if (!nextPick) nextPick = freshTopic();
+      $("nextTopic").textContent = nextPick.topic;
+      $("nextBtn").textContent = "Start round " + (s.round + 1);
+      $("nextBtn").disabled = sending || Object.keys(s.players).length < G.RULES.MIN_PLAYERS;
+    }
+    $("doneWait").textContent = "Waiting for " + hostName() + " to start round " + (s.round + 1) + ".";
+
+    var gains = $("gainList"), any = false; gains.textContent = "";
+    G.seats(s).forEach(function (id) {
+      var got = s.players[id].s - (s.base[id] === undefined ? s.players[id].s : s.base[id]);
+      if (got > 0) { any = true; gains.appendChild(person(id, "+" + got)); }
+    });
+    show("gainBox", any);
+
+    $("scoresHead").textContent = over ? "Final scores" : "Scores · first to " + s.target;
+    drawScores("scores");
+    var lead = G.leaders(s), need = lead.length === 1 ? s.target - s.players[lead[0]].s : 0;
+    $("leaderLine").textContent = !over && need > 0 && s.players[lead[0]].s > 0 ? name(lead[0]) + " needs " + need + " more to win." : "";
+
+    var who = G.authors(s), box = $("revealList"); box.textContent = "";
+    show("revealHead", s.shuffle.length > 0);
+    s.shuffle.forEach(function (a) {
+      var li = make("li");
+      li.appendChild(make("span", "text", quote(s.answers[a])));
+      li.appendChild(make("span", "tag", who[a] ? name(who[a]) : "someone who left"));
+      box.appendChild(li);
+    });
+  }
+
+  function drawOver() {
+    var w = s.winners, mine = w.length === 1 && w[0] === me.uid;
+    $("winnerLine").textContent = !w.length ? "Game over" : mine ? "You win, " + name(me.uid) + "!" :
+      list(w.map(name)) + (w.length === 1 ? " wins!" : " win!");
+    $("overLine").textContent = s.note === "host" ? cap(hostName()) + " called it. Here's how it finished." : "First to " + s.target + ".";
+    show("againBtn", isHost()); show("againWait", !isHost());
+    $("againWait").textContent = "Waiting for " + hostName() + " to start a new game.";
+    show("myStats", !!(me.google && stats));
+    if (me.google && stats) $("myStats").textContent = "You've won " + stats.w + " of " + stats.g + " games.";
+    creditMe();
+  }
+
+  /* Add a finished game to a Google player's saved wins, once. The game keeps
+     the list of who has been counted; this only avoids asking twice at once. */
+  function creditMe() {
+    if (crediting || !s || s.phase !== "over" || !me.google || !amIn() || s.credited.indexOf(me.uid) >= 0) return;
+    if (Date.now() - creditMe.at < 5000) return;   // a try that failed is not repeated at once
+    creditMe.at = Date.now();
+    crediting = true;
+    be.creditGame(code).then(function () { crediting = false; }, function () { crediting = false; });
+  }
+
+  creditMe.at = 0;
+
+  function drawVote() {
+    var can = amIn() && !isHost(), mine = s.votes.indexOf(me.uid) >= 0, n = s.votes.length, need = G.votesNeeded(s);
+    var count = n ? " (" + n + " of " + need + ")" : "";
+    var label = mine ? "Take back my vote for a new host" + count : "Vote for a new host" + count;
+    show("mVote", can); $("mVote").textContent = label;
+    show("voteLine", !can && n > 0);
+    $("voteLine").textContent = n + " of " + need + " votes for a new host.";
+    var nudge = mine ? label : cap(hostName()) + " not here? " + label;
+    show("voteDone", can && s.phase === "done"); $("voteDone").textContent = nudge;
+    show("voteLobby", can && s.phase === "lobby"); $("voteLobby").textContent = nudge;
+  }
+
+  function drawMenu() {
+    drawVote();
+    $("mSound").textContent = "Sound and buzz: " + (sound ? "on" : "off");
+    $("inviteCode").textContent = code;
+    $("inviteHow").textContent = "Scan this, or type " + code + " at " + location.host + ".";
+    $("menuScoresHead").textContent = "Scores · first to " + s.target;
+    drawScores("scores2");
+    var host = isHost() && amIn(), gone = s.phase === "write" ? missing() : [];
+    show("mHost", host);
+    show("hSkip", s.phase === "guess"); $("hSkip").textContent = s.phase === "guess" ? "Skip " + name(s.turn) + "'s turn" : "";
+    show("hGo", gone.length > 0 && gone.length < s.inRound.length);
+    $("hGo").textContent = gone.length ? "Start without " + list(gone.map(name)) : "";
+    show("hTopic", s.phase === "write");
+    show("hEnd", s.phase !== "lobby" && s.phase !== "over");
+    var box = $("removeList"); box.textContent = "";
+    G.seats(s).forEach(function (id) {
+      if (id === s.host) return;
+      var li = make("li"), b = make("button", "", s.players[id].n);
+      b.type = "button";
+      b.onclick = function () {
+        var n = s.players[id] ? s.players[id].n : "";
+        show("menuVeil", false);
+        ask("Take " + n + " out of the game? Their points go too.", "Take them out", "Keep them").then(function (yes) {
+          if (yes) quietly(act("remove", { player: id }));
+        });
+      };
+      li.appendChild(b); box.appendChild(li);
+    });
+    show("hRemove", box.children.length > 0);
+  }
+
+  /* Signed out: join with a code, or sign in. Signed in: host or join. */
+  function drawHome() {
+    var google = !!(me && me.google);
+    $("homeCards").className = google ? "signedIn" : "";
+    show("whoami", google);
+    $("whoami").textContent = google ? "Signed in as " + (me.name || "a Google user") + "." + (stats && stats.g ? " Won " + stats.w + " of " + stats.g + " games." : "") : "";
+    $("hostHead").textContent = google ? "Host a game" : "Sign in";
+    $("hostLine").textContent = google ? "You get a code for everyone else to join with."
+      : "Sign in with Google to host a game, or to keep your name and your wins on any phone.";
+    $("joinHead").textContent = google ? "Join a game" : "Got a code?";
+    show("joinNote", !google);
+    show("homeWait", !userKnown);
+    show("signInBtn", userKnown && !google);
+    show("startBtn", userKnown && google);
+    show("signOutBtn", google);
   }
 
   function render() {
-    if (!code) return;
-    var n = curRound();
-    $("topic").textContent = TOPICS[n - 1];
-    $("roundNum").textContent = String(n);
-    $("prevBtn").disabled = n <= 1;
-    $("nextBtn").disabled = n >= total;
-    if (document.activeElement !== $("jumpInput")) $("jumpInput").value = String(n);
-
-    /* answers */
-    var answers = obj(obj(cache.answers)["r" + n]);
-    var aItems = sortedKeys(answers).filter(function (id) {
-      return answers[id] && typeof answers[id].t === "string";
-    }).map(function (id) {
-      return { id: id, text: answers[id].t, on: answers[id].g === true };
-    });
-    var aLeft = aItems.filter(function (a) { return !a.on; }).length;
-    $("answerCount").textContent = aItems.length ? "(" + aLeft + " left)" : "";
-    $("answerResets").hidden = aItems.length === 0;
-    chips($("answerList"), aItems, function (it) {
-      write("answers/r" + n + "/" + it.id + "/g", !it.on);
-    });
-
-    /* players in this round */
-    var players = obj(cache.players);
-    var ids = sortedKeys(players).filter(function (id) {
-      return players[id] && typeof players[id].n === "string";
-    });
-    var out = obj(obj(cache.out)["r" + n]);
-    var pItems = ids.map(function (id) {
-      return { id: id, text: players[id].n, on: out[id] === true };
-    });
-    var pLeft = pItems.filter(function (p) { return !p.on; }).length;
-    $("rosterCount").textContent = pItems.length ? "(" + pLeft + " still in)" : "";
-    $("rosterHint").textContent = pItems.length
-      ? "Tap a player when their answer is guessed. Everyone is back in on the next round."
-      : "Add players under Players and scores, below.";
-    chips($("rosterList"), pItems, function (it) {
-      write("out/r" + n + "/" + it.id, it.on ? null : true);
-    });
-
-    /* scoreboard */
-    var top = 0;
-    ids.forEach(function (id) { var s = Number(players[id].s) || 0; if (s > top) top = s; });
-    var list = $("playerList");
-    list.textContent = "";
-    ids.forEach(function (id) {
-      var p = players[id], s = Number(p.s) || 0;
-      var li = document.createElement("li");
-      if (top > 0 && s === top) li.className = "lead";
-      var name = document.createElement("span");
-      name.className = "pname";
-      name.textContent = p.n;
-      var score = document.createElement("span");
-      score.className = "pscore";
-      score.textContent = String(s);
-      var btns = document.createElement("span");
-      btns.className = "pbtns";
-      if (editing) {
-        btns.appendChild(scoreBtn("Remove", "remove", "Remove " + p.n, function () {
-          write("players/" + id, null);
-        }));
-      } else {
-        btns.appendChild(scoreBtn("−1", "", "Take 1 point from " + p.n, function () {
-          write("players/" + id + "/s", Math.max(0, s - 1));
-        }));
-        btns.appendChild(scoreBtn("+1", "plus", "Give 1 point to " + p.n, function () {
-          write("players/" + id + "/s", s + 1);
-        }));
-        btns.appendChild(scoreBtn("+2", "plus", "Give 2 points to " + p.n, function () {
-          write("players/" + id + "/s", s + 2);
-        }));
+    var inGame = !!(code && s && me);
+    show("home", !inGame); show("play", inGame);
+    if (!inGame) { closeSheets(); drawHome(); return; }
+    var joined = amIn(), out = !joined && wasIn && !rejoining, p = s.phase;
+    $("barLabel").textContent = !joined || p === "lobby" ? "Game " + code : p === "over" ? "Game over" : "Round " + s.round;
+    show("menuBtn", joined);
+    show("name", !joined && !out); show("removed", out);
+    show("lobby", joined && p === "lobby");
+    show("write", joined && p === "write");
+    show("guess", joined && p === "guess");
+    show("over", joined && p === "over");
+    show("done", joined && (p === "done" || p === "over"));
+    if (p !== "guess") show("pickVeil", false);
+    if (out) {
+      $("removedLine").textContent = (outWhy === "vote" ? "The players voted for a new host." : outWhy === "host" ? cap(hostName()) + " took you out." : "You were taken out of this game.") +
+        " If that was a mistake, hop back in.";
+      closeSheets(); return;
+    }
+    if (!joined) {
+      show("midRound", p !== "lobby" && p !== "over");
+      show("nameSignIn", !me.google);
+      if (!$("nameInput").value && me.google && me.name && document.activeElement !== $("nameInput")) {
+        $("nameInput").value = me.name.split(" ")[0].slice(0, 20);
       }
-      li.appendChild(name);
-      li.appendChild(score);
-      li.appendChild(btns);
-      list.appendChild(li);
-    });
-    if (!ids.length) editing = false;
-    $("resets").hidden = ids.length === 0;
-    $("editBtn").setAttribute("aria-pressed", editing ? "true" : "false");
-    $("editBtn").textContent = editing ? "Done removing" : "Remove a player";
-  }
-
-  function scoreBtn(label, cls, aria, fn) {
-    var b = document.createElement("button");
-    b.type = "button";
-    b.textContent = label;
-    if (cls) b.className = cls;
-    b.setAttribute("aria-label", aria);
-    b.addEventListener("click", fn);
-    return b;
-  }
-
-  /* Two taps for anything that wipes shared data. */
-  function twoTap(btn, label, action) {
-    var timer = null;
-    btn.addEventListener("click", function () {
-      if (btn.classList.contains("armed")) {
-        clearTimeout(timer);
-        btn.classList.remove("armed");
-        btn.textContent = label;
-        action();
-      } else {
-        btn.classList.add("armed");
-        btn.textContent = "Tap again to confirm";
-        timer = setTimeout(function () {
-          btn.classList.remove("armed");
-          btn.textContent = label;
-        }, 4000);
-      }
-    });
-  }
-
-  /* ---------- wiring ---------- */
-  $("roundTotal").textContent = String(total);
-  $("jumpInput").max = String(total);
-
-  $("joinForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    join($("codeInput").value, false);
-  });
-  $("startBtn").addEventListener("click", function () { start(0); });
-  $("leaveBtn").addEventListener("click", leave);
-
-  $("inviteBtn").addEventListener("click", function () {
-    var link = location.origin + location.pathname + "#" + code;
-    var box = $("inviteLink");
-    function showLink(note) {
-      box.textContent = note + " " + link;
-      box.hidden = false;
+      return;
     }
-    if (navigator.share) {
-      navigator.share({ title: "Thanksgiving Things", text: "Join our game with code " + code, url: link })
-        .catch(function () { showLink("Send this link:"); });
-    } else if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(link).then(function () { showLink("Link copied:"); },
-        function () { showLink("Send this link:"); });
-    } else {
-      showLink("Send this link:");
-    }
-  });
-
-  $("prevBtn").addEventListener("click", function () { var n = curRound(); if (n > 1) write("round", n - 1); });
-  $("nextBtn").addEventListener("click", function () { var n = curRound(); if (n < total) write("round", n + 1); });
-  $("jumpForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    var n = parseInt($("jumpInput").value, 10);
-    if (!isNaN(n)) write("round", Math.min(total, Math.max(1, n)));
-    $("jumpInput").blur();
-  });
-
-  $("answerForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    var v = $("answerInput").value.trim().slice(0, 80);
-    if (!v) return;
-    $("answerInput").value = "";
-    write("answers/r" + curRound() + "/" + newId(), { t: v, g: false });
-  });
-  twoTap($("clearAnswersBtn"), "Clear this round's answers", function () {
-    write("answers/r" + curRound(), null);
-  });
-
-  $("addForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    var v = $("nameInput").value.trim().slice(0, 24);
-    if (!v) return;
-    $("nameInput").value = "";
-    write("players/" + newId(), { n: v, s: 0 });
-  });
-  $("editBtn").addEventListener("click", function () { editing = !editing; render(); });
-  twoTap($("zeroBtn"), "Zero the scores", function () {
-    var players = obj(cache.players);
-    Object.keys(players).forEach(function (id) {
-      if (players[id] && typeof players[id].n === "string") write("players/" + id + "/s", 0);
-    });
-  });
-
-  window.addEventListener("hashchange", function () {
-    var h = location.hash.replace(/^#/, "").toUpperCase();
-    if (CODE_RE.test(h) && h !== code) { closeStream(); code = null; showView("lobby"); join(h, true); }
-  });
-
-  /* ---------- start ---------- */
-  if (!CONFIGURED) {
-    showView("setup");
-  } else {
-    showView("lobby");
-    var wanted = location.hash.replace(/^#/, "").toUpperCase();
-    if (!CODE_RE.test(wanted)) {
-      try { wanted = localStorage.getItem(CKEY) || ""; } catch (e) { wanted = ""; }
-    }
-    if (CODE_RE.test(wanted)) { $("codeInput").value = wanted; join(wanted, true); }
+    if (p === "lobby") drawLobby();
+    if (p === "write") drawWrite();
+    if (p === "guess") drawGuess();
+    if (p === "done" || p === "over") drawDone();
+    if (p === "over") drawOver();
+    drawMenu();
+    tick();
   }
-})();
+
+  /* ---------- a phone left open picks up a newer version ---------- */
+  /* An open tab keeps running the page it loaded. If the site has moved on,
+     this phone would send moves the game no longer accepts ("This phone can't
+     do that"), so it reloads itself; the game and the seat are on the server. */
+  var stale = false;
+  /* Not a moment to reload: something typed and not sent, a panel open, or a move on its way. */
+  function busy() {
+    /* an answer or topic being written, or a field the player is in right now;
+       the code and name boxes are often filled in by the page itself */
+    var typed = ["answerInput", "ownTopicInput", "tOwnInput"].some(function (id) {
+      return $(id).value !== "" && $(id).offsetParent !== null;
+    }) || (!!document.activeElement && document.activeElement.tagName === "INPUT" && document.activeElement.value !== "");
+    var open = ["menuVeil", "pickVeil", "askVeil"].some(function (id) { return !$(id).hidden; });
+    return typed || open || sending || navigator.onLine === false;
+  }
+  function checkVersion() {
+    if (stale) { if (!busy()) location.reload(); return; }
+    if (!window.fetch || document.visibilityState === "hidden") return;
+    fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (html) {
+      var m = /WSI_VERSION = "(\d+)"/.exec(html);
+      if (!m || m[1] === window.WSI_VERSION) return;
+      stale = true;
+      if (busy()) toast("A newer version of the game is ready. It will load in a moment.");
+      else location.reload();
+    }).catch(function () {});
+  }
+  setInterval(checkVersion, 60000);
+  document.addEventListener("visibilitychange", checkVersion);
+
+  /* ---------- start: an invite link or the last game on this phone ---------- */
+  var wanted = location.hash.replace(/^#/, "").toUpperCase();
+  if (!/^[A-Z2-9]{6}$/.test(wanted)) {
+    try { wanted = localStorage.getItem("wsi-code") || ""; } catch (e) { wanted = ""; }
+  }
+  render();
+  if (/^[A-Z2-9]{6}$/.test(wanted)) { $("codeInput").value = wanted; open(wanted); }
+};
+if (window.WSI_DEPS) window.startWhoSaidIt(window.WSI_DEPS);   // set by the tests
+</script>
+
+<script type="module">
+/* Load the Firebase SDK, the adapter, the rules and the topics, then start. */
+const config = {
+  apiKey: "AIzaSyAE-_H-82q7JAqQug-DbaXrTey0c5qUna4",
+  authDomain: "who-said-it-8eeaa.firebaseapp.com",
+  projectId: "who-said-it-8eeaa",
+  storageBucket: "who-said-it-8eeaa.firebasestorage.app",
+  messagingSenderId: "468828250798",
+  appId: "1:468828250798:web:0263ed34af372e69c2433f"
+};
+if (!window.WSI_DEPS) {
+  const cdn = "https://www.gstatic.com/firebasejs/13.4.0/";
+  /* A new page never runs with an old copy of these files. */
+  const version = "?v=" + window.WSI_VERSION;
+  try {
+    const [app, auth, store, backend, game, topics] = await Promise.all([
+      import(cdn + "firebase-app.js"),
+      import(cdn + "firebase-auth.js"),
+      import(cdn + "firebase-firestore.js"),
+      import("./backend.js" + version),
+      import("./game.js" + version),
+      import("./topics.js" + version)
+    ]);
+    const sdk = Object.assign({}, app, auth, store);
+    /* WSI_TEST is set only by the automated browser check, to point at the emulators. */
+    const options = window.WSI_TEST ? window.WSI_TEST(sdk) : {};
+    window.startWhoSaidIt({ backend: backend.makeBackend(sdk, config, options), game, topics });
+  } catch (e) {
+    document.getElementById("homeWait").textContent = "Couldn't load the game. Check your internet and reload.";
+  }
+}
 </script>
 </body>
 </html>

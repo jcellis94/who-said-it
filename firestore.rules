@@ -1,0 +1,448 @@
+rules_version = '2';
+
+// ===============================================================
+// Two versions share this file while the site is switched over.
+//
+//   games/{code}, users/{uid}   the current game (index.html, game.js)
+//   rooms/{code}/...            the earlier prototype page. Its block is
+//                               unchanged, so a phone still showing the old
+//                               page keeps working. Remove it once the new
+//                               page has been live for a while.
+//
+// ---------------------------------------------------------------
+// Current game
+// ---------------------------------------------------------------
+//
+// Who signs in:
+//   - The HOST signs in with Google and creates a game.
+//   - Everyone else joins with the game code. With no account they are
+//     signed in anonymously; Google sign-in is optional for them.
+//   - Knowing the six-character code is what admits a player, so games
+//     can be fetched one at a time but never listed.
+//
+// Collection: games
+// Document ID: six characters, A-Z and 2-9 (the game code)
+// One document holds the whole game. game.js lists the fields and holds
+// the rules of play (turns, scoring); phones apply them, mostly inside a
+// transaction.
+//
+// What these security rules enforce:
+//   - only someone signed in who has the code reads a game; no listing
+//   - only a Google user creates a game, empty, as its host
+//   - the creation time never changes and games are never deleted; the
+//     host changes only when enough players have voted for a new one
+//   - exact field list, types, sizes and cross-references on every write
+//   - someone not in the game may only take their own seat, at 0 points
+//   - a player who is not the host may not touch anyone else's seat or
+//     score, may add or change only their own answer, may not change the
+//     target or the topic pack, may cast or take back only their own vote,
+//     and may gain points only on their own turn (1 for a guess, 3 for
+//     the last one). They may move the round along (phase, turn, the
+//     round's lists), because the rules of play run on the phones.
+//   - answers change only while a round is being written
+//
+// What they do NOT enforce (accepted by the owner on 2026-11-27, "casual
+// family game"): that a claimed guess was really right, or whose turn
+// comes next. Every phone in a game also receives the whole document,
+// including who wrote each answer; the page hides it, the data does not.
+// The host's writes are trusted beyond the shape checks, because the
+// host may remove players and reset scores.
+//
+// Reads use `get` and forbid `list` on purpose: a game code is the only
+// thing that admits a player, so codes must not be discoverable.
+//
+// Collection: users
+// Document ID: the Google user's uid
+// Fields:
+//   - w: int - games won
+//   - g: int - games finished
+// Readable and writable only by that user; each write adds at most one.
+//
+// No document holds an email address or a real name; players type a
+// character name.
+//
+// ---------------------------------------------------------------
+// Prototype (rooms)
+// ---------------------------------------------------------------
+//
+// Who signs in:
+//   - The HOST signs in with Google and creates a room.
+//   - GUESTS join with the room code and are signed in anonymously
+//     (Firebase Anonymous Auth, no account).
+//   - Everyone in a room may run the game: change the round, add and
+//     remove players, keep score, add answers and mark them guessed.
+//   - Knowing the six-character code is what admits a guest, so room
+//     codes can be fetched one at a time but never listed.
+//
+// Collection: rooms
+// Document ID: six characters, A-Z and 2-9 (the game code)
+// Fields:
+//   - host: string (required, immutable) - uid of the Google user who created it
+//   - created: timestamp (required, immutable) - server time at creation
+//   - round: int (required, 1..500) - the round every phone shows
+//
+// Collection: rooms/{code}/players
+// Document ID: 9 characters 0-9a-z then 6 characters A-Z2-9 (sorts by creation time)
+// Fields:
+//   - n: string (required, immutable, 1..24 chars) - player name
+//   - s: int (required, 0..100000) - score
+//   - o: int (required, 0..500) - round in which this player was guessed out, 0 for none
+//
+// Collection: rooms/{code}/answers
+// Document ID: same pattern as players
+// Fields:
+//   - r: int (required, immutable, 1..500) - round the answer belongs to
+//   - t: string (required, immutable, 1..80 chars) - the answer text
+//   - g: bool (required) - true once the answer has been guessed
+//
+// No document holds an email address or any other personal detail.
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Signed in at all (Google host or anonymous guest).
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Signed in with a Google account.
+    function isGoogleUser() {
+      return isAuthenticated() &&
+        request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function isValidCode(code) {
+      return code.matches('^[A-Z2-9]{6}$');
+    }
+
+    function isValidId(id) {
+      return id.matches('^[0-9a-z]{9}[A-Z2-9]{6}$');
+    }
+
+    // The room this player or answer belongs to must exist.
+    function roomExists(code) {
+      return isValidCode(code) &&
+        exists(/databases/$(database)/documents/rooms/$(code));
+    }
+
+    function hasExactly(data, fields) {
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields);
+    }
+
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function isIntBetween(value, low, high) {
+      return value is int && value >= low && value <= high;
+    }
+
+    // ===============================================================
+    // Domain Validators (used by both create and update)
+    // ===============================================================
+
+    function isValidRoom(data) {
+      return hasExactly(data, ['host', 'created', 'round']) &&
+        data.host is string && data.host.size() >= 1 && data.host.size() <= 128 &&
+        data.created is timestamp &&
+        isIntBetween(data.round, 1, 500);
+    }
+
+    function isValidPlayer(data) {
+      return hasExactly(data, ['n', 's', 'o']) &&
+        data.n is string && data.n.size() >= 1 && data.n.size() <= 24 &&
+        isIntBetween(data.s, 0, 100000) &&
+        isIntBetween(data.o, 0, 500);
+    }
+
+    function isValidAnswer(data) {
+      return hasExactly(data, ['r', 't', 'g']) &&
+        isIntBetween(data.r, 1, 500) &&
+        data.t is string && data.t.size() >= 1 && data.t.size() <= 80 &&
+        data.g is bool;
+    }
+
+    // A score moves by -1, +1 or +2 per tap, or is reset to zero.
+    function isValidScoreChange() {
+      return request.resource.data.s == resource.data.s ||
+        request.resource.data.s == 0 ||
+        (request.resource.data.s - resource.data.s) in [-1, 1, 2];
+    }
+
+
+    // ===============================================================
+    // Current game: validators
+    // ===============================================================
+
+    // Security Rules stop evaluating a request after 1,000 expressions, and
+    // this document has 28 fields, so the checks below are written to be
+    // cheap. `test/phones.mjs` plays whole games through them; if a rule is
+    // added here, run it and keep the margin.
+    //
+    // The field list is enforced by the count plus the fact that every field
+    // is read below (a missing field fails the read). `host` and `created`
+    // are not re-checked here: create pins them to the signed-in user and the
+    // server time, and update requires them unchanged.
+    function isValidGame(data) {
+      return data.size() == 28 &&
+        data.target in [5, 10, 15, 20] &&
+        data.pack is string && data.pack.size() <= 20 &&
+        data.phase in ['lobby', 'write', 'guess', 'done', 'over'] &&
+        data.round is int &&
+        data.topic is string && data.topic.size() <= 120 &&
+        data.used is list && data.used.size() <= 500 &&
+        data.players is map && data.players.size() <= 20 &&
+        // lists of player ids must point at real entries
+        data.inRound is list && data.inRound.size() <= 20 && data.inRound.hasOnly(data.players.keys()) &&
+        data.alive is list && data.alive.size() <= 20 && data.alive.hasOnly(data.inRound) &&
+        data.answers is map && data.answers.size() <= 20 &&
+        data.shuffle is list && data.shuffle.size() <= 20 && data.shuffle.hasOnly(data.answers.keys()) &&
+        data.found is map && data.found.size() <= 20 &&
+        (data.turn == '' || data.turn in data.alive) &&
+        data.misses in [0, 1, 2, 3] &&
+        data.allowed in [1, 2, 3] &&
+        data.trips is int &&
+        data.tripLeft is int &&
+        data.since is number &&
+        data.seq is int &&
+        isValidLast(data.last) &&
+        data.log is list && data.log.size() <= 40 &&
+        data.base is map && data.base.size() <= 20 &&
+        data.note is string && data.note.size() <= 10 &&
+        data.winners is list && data.winners.size() <= 20 &&
+        data.credited is list && data.credited.size() <= 20 &&
+        data.votes is list && data.votes.size() <= 20;
+    }
+
+    // The latest event (a guess, a pass, a player taken out, a new host), shown once
+    // on every phone.
+    function isValidLast(last) {
+      return last == null ||
+        (last is map && last.size() == 5 &&
+         last.kind in ['guess', 'pass', 'left', 'host'] &&
+         last.by is string && last.by.size() <= 128 &&
+         last.answer is string && last.answer.size() <= 128 &&
+         last.target is string && last.target.size() <= 128 &&
+         last.ok is bool);
+    }
+
+    function isValidSeat(seat) {
+      return seat is map && seat.size() == 3 &&
+        seat.n is string && seat.n.size() >= 1 && seat.n.size() <= 20 &&
+        seat.s is int && seat.s >= 0 && seat.s <= 100000 &&
+        seat.j is number;
+    }
+
+    // Rules cannot loop over every player, so they check the writer's own
+    // seat and answer; the 20-entry caps and Firestore's 1 MiB document
+    // limit bound the rest.
+    function ownEntriesValid(data) {
+      let uid = request.auth.uid;
+      return (!(uid in data.players) || isValidSeat(data.players[uid])) &&
+        (!(uid in data.answers) ||
+          (data.answers[uid] is string && data.answers[uid].size() >= 1 && data.answers[uid].size() <= 80));
+    }
+
+    // Answers are written one at a time without a transaction, so the rules
+    // close them: they change only while a round is being written, when a
+    // round starts, or when they are all cleared.
+    function answersOpen() {
+      return request.resource.data.answers == resource.data.answers ||
+        resource.data.phase == 'write' ||
+        request.resource.data.phase == 'write' ||
+        request.resource.data.answers.size() == 0;
+    }
+
+    // A player who is not the host: their own seat and answer only, the
+    // host's settings untouched, and points only on their own turn.
+    function isPlayersOwnMove() {
+      // Security Rules stop evaluating a request after 1,000 expressions, so
+      // each value here is worked out once and reused.
+      let uid = request.auth.uid;
+      let before = resource.data;
+      let after = request.resource.data;
+      let answers = after.answers.diff(before.answers);
+      let gain = uid in after.players ? after.players[uid].s - before.players[uid].s : 0;
+      return after.target == before.target &&
+        after.pack == before.pack &&
+        // a vote for a new host: only your own, added or taken back
+        after.votes.removeAll([uid]) == before.votes.removeAll([uid]) &&
+        after.players.diff(before.players).affectedKeys().hasOnly([uid]) &&
+        uid in after.players &&
+        answers.addedKeys().hasOnly([uid]) &&
+        answers.changedKeys().hasOnly([uid]) &&
+        (gain == 0 || (gain in [1, 3] && before.phase == 'guess' && before.turn == uid));
+    }
+
+    // The players vote for a new host (game.js voteHost). The write that
+    // completes the vote hands the game to another player and takes the
+    // old host out. It needs three votes counting the writer's own, or
+    // every other player's if there are fewer than three of them. The
+    // host's settings stay as they were. Scores and the round's lists are
+    // not checked here beyond their shape, because taking the old host out
+    // mid-round can end the round.
+    function isHostVotedOut() {
+      let uid = request.auth.uid;
+      let before = resource.data;
+      let after = request.resource.data;
+      let votes = before.votes.removeAll([uid]).size() + 1;
+      return uid in before.players &&
+        uid != before.host &&
+        (votes >= 3 || votes + 1 >= before.players.size()) &&
+        after.host in after.players &&
+        after.votes.size() == 0 &&
+        after.target == before.target &&
+        after.pack == before.pack;
+    }
+
+    function mayPlay() {
+      return request.auth.uid == resource.data.host ||
+        (request.auth.uid in resource.data.players && isPlayersOwnMove());
+    }
+
+    // Someone with the code taking a seat: adds their own entry, nothing else.
+    function isTakingSeat() {
+      return changedOnly(['players']) &&
+        request.resource.data.players.diff(resource.data.players).addedKeys().hasOnly([request.auth.uid]) &&
+        request.resource.data.players.diff(resource.data.players).removedKeys().size() == 0 &&
+        request.resource.data.players.diff(resource.data.players).changedKeys().size() == 0 &&
+        request.resource.data.players[request.auth.uid].s == 0;
+    }
+
+    // ===============================================================
+    // Games
+    // ===============================================================
+
+    match /games/{code} {
+      // One game at a time, by its code. Never listed.
+      allow get: if isAuthenticated() && isValidCode(code);
+      allow list: if false;
+
+      // Only a Google-signed-in host creates a game: empty, in the lobby.
+      allow create: if isGoogleUser() &&
+        isValidCode(code) &&
+        isValidGame(request.resource.data) &&
+        request.resource.data.host == request.auth.uid &&
+        request.resource.data.created == request.time &&
+        request.resource.data.phase == 'lobby' &&
+        request.resource.data.round == 0 &&
+        request.resource.data.players.size() == 0 &&
+        request.resource.data.answers.size() == 0;
+
+      // The host runs the game, players make their own moves, and anyone
+      // else with the code may only take a seat.
+      allow update: if isAuthenticated() &&
+        isValidGame(request.resource.data) &&
+        ownEntriesValid(request.resource.data) &&
+        request.resource.data.created == resource.data.created &&
+        answersOpen() &&
+        (request.resource.data.host == resource.data.host
+          ? (mayPlay() || isTakingSeat())
+          : isHostVotedOut());
+
+      allow delete: if false;
+    }
+
+    // ===============================================================
+    // Saved wins
+    // ===============================================================
+
+    function isValidStats(data) {
+      return hasExactly(data, ['w', 'g']) &&
+        isIntBetween(data.w, 0, 1000000) &&
+        isIntBetween(data.g, 0, 1000000) &&
+        data.w <= data.g;
+    }
+
+    match /users/{userId} {
+      allow get: if isAuthenticated() && request.auth.uid == userId;
+      allow list: if false;
+
+      allow create: if isGoogleUser() && request.auth.uid == userId &&
+        isValidStats(request.resource.data) &&
+        request.resource.data.g == 1;
+
+      // One finished game at a time.
+      allow update: if isGoogleUser() && request.auth.uid == userId &&
+        isValidStats(request.resource.data) &&
+        request.resource.data.g == resource.data.g + 1 &&
+        (request.resource.data.w - resource.data.w) in [0, 1];
+
+      allow delete: if false;
+    }
+
+    // ===============================================================
+    // Prototype: rooms (unchanged)
+    // ===============================================================
+
+    match /rooms/{code} {
+      // One room at a time, by its code. Listing is never allowed, so
+      // nobody can discover other groups' codes.
+      allow get: if isAuthenticated() && isValidCode(code);
+      allow list: if false;
+
+      // Only a Google-signed-in host creates a room, and only as themselves.
+      allow create: if isGoogleUser() &&
+        isValidCode(code) &&
+        isValidRoom(request.resource.data) &&
+        request.resource.data.host == request.auth.uid &&
+        request.resource.data.created == request.time &&
+        request.resource.data.round == 1;
+
+      // Anyone in the room moves the round. Nothing else changes.
+      allow update: if isAuthenticated() &&
+        isValidRoom(request.resource.data) &&
+        changedOnly(['round']);
+
+      allow delete: if false;
+
+      // ===============================================================
+      // Players
+      // ===============================================================
+
+      match /players/{playerId} {
+        allow read: if isAuthenticated() && roomExists(code);
+
+        allow create: if isAuthenticated() && roomExists(code) &&
+          isValidId(playerId) &&
+          isValidPlayer(request.resource.data) &&
+          request.resource.data.s == 0 &&
+          request.resource.data.o == 0;
+
+        // The name is fixed; the score and the "out" mark change.
+        allow update: if isAuthenticated() && roomExists(code) &&
+          isValidPlayer(request.resource.data) &&
+          changedOnly(['s', 'o']) &&
+          isValidScoreChange();
+
+        allow delete: if isAuthenticated() && roomExists(code);
+      }
+
+      // ===============================================================
+      // Answers
+      // ===============================================================
+
+      match /answers/{answerId} {
+        allow read: if isAuthenticated() && roomExists(code);
+
+        allow create: if isAuthenticated() && roomExists(code) &&
+          isValidId(answerId) &&
+          isValidAnswer(request.resource.data) &&
+          request.resource.data.g == false;
+
+        // Only the guessed mark changes.
+        allow update: if isAuthenticated() && roomExists(code) &&
+          isValidAnswer(request.resource.data) &&
+          changedOnly(['g']);
+
+        allow delete: if isAuthenticated() && roomExists(code);
+      }
+    }
+  }
+}
