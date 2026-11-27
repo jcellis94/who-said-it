@@ -176,69 +176,64 @@ service cloud.firestore {
     // Current game: validators
     // ===============================================================
 
-    function gameFields() {
-      return ['host', 'created', 'target', 'pack', 'phase', 'round', 'topic', 'used',
-        'players', 'inRound', 'alive', 'answers', 'shuffle', 'found',
-        'turn', 'misses', 'allowed', 'trips', 'tripLeft', 'deadline',
-        'last', 'note', 'winners', 'credited'];
+    // Security Rules stop evaluating a request after 1,000 expressions, and
+    // this document has 30 fields, so the checks below are written to be
+    // cheap. `test/phones.mjs` plays whole games through them; if a rule is
+    // added here, run it and keep the margin.
+    //
+    // The field list is enforced by the count plus the fact that every field
+    // is read below (a missing field fails the read). `host` and `created`
+    // are not re-checked here: create pins them to the signed-in user and the
+    // server time, and update requires them unchanged.
+    function isValidGame(data) {
+      return data.size() == 30 &&
+        data.target in [5, 10, 15, 20] &&
+        data.pack is string && data.pack.size() <= 20 &&
+        data.phase in ['lobby', 'write', 'read', 'guess', 'done', 'over'] &&
+        data.round is int &&
+        data.topic is string && data.topic.size() <= 120 &&
+        data.used is list && data.used.size() <= 500 &&
+        data.players is map && data.players.size() <= 20 &&
+        // lists of player ids must point at real entries
+        data.inRound is list && data.inRound.size() <= 20 && data.inRound.hasOnly(data.players.keys()) &&
+        data.alive is list && data.alive.size() <= 20 && data.alive.hasOnly(data.inRound) &&
+        data.answers is map && data.answers.size() <= 20 &&
+        data.shuffle is list && data.shuffle.size() <= 20 && data.shuffle.hasOnly(data.answers.keys()) &&
+        data.found is map && data.found.size() <= 20 &&
+        (data.reader == '' || data.reader in data.alive) &&
+        data.shown is int && data.shown <= data.shuffle.size() &&
+        (data.turn == '' || data.turn in data.alive) &&
+        data.misses in [0, 1, 2, 3] &&
+        data.allowed in [1, 2, 3] &&
+        data.trips is int &&
+        data.tripLeft is int &&
+        data.deadline is number &&
+        data.since is number &&
+        data.seq is int &&
+        isValidLast(data.last) &&
+        data.log is list && data.log.size() <= 40 &&
+        data.base is map && data.base.size() <= 20 &&
+        data.note is string && data.note.size() <= 10 &&
+        data.winners is list && data.winners.size() <= 20 &&
+        data.credited is list && data.credited.size() <= 20;
     }
 
-    function isShortString(value, max) {
-      return value is string && value.size() <= max;
-    }
-
-    function isShortList(value, max) {
-      return value is list && value.size() <= max;
-    }
-
-    function isUidString(value) {
-      return value is string && value.size() <= 128;
-    }
-
-    // The last guess or skip, shown as a banner.
+    // The latest event (a guess, a pass, a player taken out), shown once
+    // on every phone.
     function isValidLast(last) {
       return last == null ||
-        (last is map && hasExactly(last, ['by', 'answer', 'target', 'ok', 'skip']) &&
-         isUidString(last.by) && isUidString(last.answer) && isUidString(last.target) &&
-         last.ok is bool && last.skip is bool);
-    }
-
-    function isValidGame(data) {
-      return hasExactly(data, gameFields()) &&
-        data.host is string && data.host.size() >= 1 && data.host.size() <= 128 &&
-        data.created is timestamp &&
-        data.target in [5, 10, 15, 20] &&
-        isShortString(data.pack, 20) &&
-        data.phase in ['lobby', 'write', 'guess', 'done', 'over'] &&
-        isIntBetween(data.round, 0, 100000) &&
-        isShortString(data.topic, 120) &&
-        // topic numbers already played: digits only
-        isShortList(data.used, 500) && data.used.join(',').matches('^[0-9,]*$') &&
-        data.players is map && data.players.size() <= 20 &&
-        // the lists below hold player ids and must point at real entries
-        isShortList(data.inRound, 20) && data.inRound.hasOnly(data.players.keys()) &&
-        isShortList(data.alive, 20) && data.alive.hasOnly(data.inRound) &&
-        data.answers is map && data.answers.size() <= 20 &&
-        isShortList(data.shuffle, 20) && data.shuffle.hasOnly(data.answers.keys()) &&
-        data.found is map && data.found.size() <= 20 && data.found.keys().hasOnly(data.shuffle) &&
-        isUidString(data.turn) && (data.turn == '' || data.turn in data.alive) &&
-        isIntBetween(data.misses, 0, 3) &&
-        isIntBetween(data.allowed, 1, 3) &&
-        isIntBetween(data.trips, 0, 100000) &&
-        isIntBetween(data.tripLeft, 0, 20) &&
-        // a clock time in ms, never more than a day ahead
-        data.deadline is number && data.deadline >= 0 &&
-        data.deadline <= request.time.toMillis() + 86400000 &&
-        isValidLast(data.last) &&
-        isShortString(data.note, 10) &&
-        isShortList(data.winners, 20) && data.winners.hasOnly(data.players.keys()) &&
-        isShortList(data.credited, 20);
+        (last is map && last.size() == 5 &&
+         last.kind in ['guess', 'pass', 'left'] &&
+         last.by is string && last.by.size() <= 128 &&
+         last.answer is string && last.answer.size() <= 128 &&
+         last.target is string && last.target.size() <= 128 &&
+         last.ok is bool);
     }
 
     function isValidSeat(seat) {
-      return seat is map && hasExactly(seat, ['n', 's', 'j']) &&
+      return seat is map && seat.size() == 3 &&
         seat.n is string && seat.n.size() >= 1 && seat.n.size() <= 20 &&
-        isIntBetween(seat.s, 0, 100000) &&
+        seat.s is int && seat.s >= 0 && seat.s <= 100000 &&
         seat.j is number;
     }
 
@@ -246,11 +241,10 @@ service cloud.firestore {
     // seat and answer; the 20-entry caps and Firestore's 1 MiB document
     // limit bound the rest.
     function ownEntriesValid(data) {
-      return (!(request.auth.uid in data.players) || isValidSeat(data.players[request.auth.uid])) &&
-        (!(request.auth.uid in data.answers) ||
-          (data.answers[request.auth.uid] is string &&
-           data.answers[request.auth.uid].size() >= 1 &&
-           data.answers[request.auth.uid].size() <= 80));
+      let uid = request.auth.uid;
+      return (!(uid in data.players) || isValidSeat(data.players[uid])) &&
+        (!(uid in data.answers) ||
+          (data.answers[uid] is string && data.answers[uid].size() >= 1 && data.answers[uid].size() <= 80));
     }
 
     // Answers are written one at a time without a transaction, so the rules
@@ -265,23 +259,21 @@ service cloud.firestore {
 
     // A player who is not the host: their own seat and answer only, the
     // host's settings untouched, and points only on their own turn.
-    function ownScoreGain() {
-      return request.auth.uid in request.resource.data.players && request.auth.uid in resource.data.players
-        ? request.resource.data.players[request.auth.uid].s - resource.data.players[request.auth.uid].s
-        : 0;
-    }
-
     function isPlayersOwnMove() {
-      return request.resource.data.target == resource.data.target &&
-        request.resource.data.pack == resource.data.pack &&
-        request.resource.data.players.diff(resource.data.players).affectedKeys().hasOnly([request.auth.uid]) &&
-        request.auth.uid in request.resource.data.players &&
-        request.resource.data.answers.diff(resource.data.answers).addedKeys().hasOnly([request.auth.uid]) &&
-        request.resource.data.answers.diff(resource.data.answers).changedKeys().hasOnly([request.auth.uid]) &&
-        (ownScoreGain() == 0 ||
-          (ownScoreGain() in [1, 3] &&
-           resource.data.phase == 'guess' &&
-           resource.data.turn == request.auth.uid));
+      // Security Rules stop evaluating a request after 1,000 expressions, so
+      // each value here is worked out once and reused.
+      let uid = request.auth.uid;
+      let before = resource.data;
+      let after = request.resource.data;
+      let answers = after.answers.diff(before.answers);
+      let gain = uid in after.players ? after.players[uid].s - before.players[uid].s : 0;
+      return after.target == before.target &&
+        after.pack == before.pack &&
+        after.players.diff(before.players).affectedKeys().hasOnly([uid]) &&
+        uid in after.players &&
+        answers.addedKeys().hasOnly([uid]) &&
+        answers.changedKeys().hasOnly([uid]) &&
+        (gain == 0 || (gain in [1, 3] && before.phase == 'guess' && before.turn == uid));
     }
 
     function mayPlay() {

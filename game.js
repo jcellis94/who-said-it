@@ -5,47 +5,65 @@
    runs a move inside a Firestore transaction, so two phones cannot both apply
    a move to the same state. test/game.test.mjs tests this file on its own.
 
+   A round goes: write (everyone sends one secret answer), read (the reader
+   shows the answers one at a time and reads them aloud), guess (turns), done.
+   There are no clocks during a round. A guesser may pass; the host may pass
+   anyone and may close the writing. If nothing has happened for STALL_MS,
+   every player may do what the host could, so a missing host cannot freeze
+   the game. The only clock is the pause before the next round starts itself.
+
    State is one document, games/{CODE}:
      host      uid of the Google user who created the game
      created   server timestamp
      target    first to this many points wins (checked at the end of a round)
      pack      topic pack key (see topics.js)
-     phase     lobby | write | guess | done | over
+     phase     lobby | write | read | guess | done | over
      round     0 in the lobby, then 1, 2, ...
      topic     this round's topic
      used      topic numbers already played from this pack
-     players   { uid: { n: character name, s: score, j: joined (ms) } }
-     inRound   uids playing this round, in seat order
-     alive     uids not yet guessed this round, in seat order
+     players   { uid: { n: name, s: score, j: joined (ms) } }
+     inRound   uids playing this round, in join order
+     alive     uids not yet caught this round, in join order
      answers   { uid: text }   the page shows the text and hides the uid
-     shuffle   uids of answers in the order every phone shows them
+     shuffle   uids of answers in the order they are read and shown
      found     { answer uid: uid of the player it was matched to }
+     reader    uid reading the answers aloud; they also guess first
+     shown     how many answers the reader has revealed
      turn      uid whose turn it is to guess
      misses    wrong guesses made this turn
      allowed   wrong guesses allowed per turn (grows as trips go by)
      trips     full trips of the turn around the table this round
      tripLeft  turns left in the current trip
-     deadline  ms time the write step, the turn or the pause between rounds ends
-     last      the last guess or skip, for the banner
+     deadline  ms time the next round starts by itself (0 during a round)
+     since     ms time of the last thing that happened, for the safety net
+     seq       goes up by one with every event, so phones show each one once
+     last      the latest event: { kind: guess | pass | left, by, answer, target, ok }
+                 guess: by guessed that target wrote answer (an answer uid)
+                 pass:  by's turn was passed by target (themselves, the host, anyone)
+                 left:  the host removed a player; answer holds their name
+     log       this round's guesses, oldest first
+     base      { uid: score when the round started }, for "this round" points
      note      "" | "few" (round void) | "tie" (target reached, top scores level)
+               | "host" (the host ended the game early)
      winners   uids, once the phase is over
      credited  Google uids whose saved win counts already include this game */
 
 /* The numbers the owner wants to play with. Change them here only. */
 export var RULES = {
-  WRITE_MS: 90000,      // time to write an answer
-  TURN_MS: 45000,       // time to make a guess
-  NEXT_MS: 20000,       // pause before the next round starts by itself
-  TRIPS_PER_STEP: 2,    // trips around the table before everyone gets one more miss
+  NEXT_MS: 60000,       // pause before the next round starts by itself
+  STALL_MS: 120000,     // quiet time before any player may do the host's unsticking
+  READ_MS: 20000,       // quiet time before the next answer shows itself
+  TRIPS_PER_STEP: 2,    // trips around the table before everyone gets one more try
   MAX_MISSES: 3,        // most wrong guesses per turn
-  BONUS: 2,             // points for the last unguessed player
+  BONUS: 2,             // points for the last one hiding
   TARGETS: [5, 10, 15, 20],
   DEFAULT_TARGET: 10,
   MIN_PLAYERS: 2,
   MAX_PLAYERS: 20,
   NAME_MAX: 20,
   ANSWER_MAX: 80,
-  TOPIC_MAX: 120
+  TOPIC_MAX: 120,
+  LOG_MAX: 40
 };
 
 export function GameError(message) {
@@ -56,16 +74,25 @@ GameError.prototype = Object.create(Error.prototype);
 
 function fail(message) { throw new GameError(message); }
 
-/* A move made for the clock names the deadline the phone saw. It counts only
-   if that deadline is still the current one and has passed, so two phones
-   acting on the same expired clock cannot both move the game. */
+/* The pause between rounds: a phone starting the next round for the clock
+   names the deadline it saw, so two phones cannot both start a round. */
 function clockRanOut(s, uid, args, now) {
   return !!(args && args.clock) && !!s.players[uid] && s.deadline > 0 &&
     args.deadline === s.deadline && now >= s.deadline;
 }
-function mayMove(s, uid, args, now, what) {
-  if (args && args.clock) { if (!clockRanOut(s, uid, args, now)) fail("The clock has already moved on."); }
-  else if (uid !== s.host) fail("Only the host can " + what + ".");
+/* The host, or any player once the game has been quiet for STALL_MS. */
+function hostOrStalled(s, uid, now, what) {
+  if (uid === s.host) return;
+  if (s.players[uid] && now - s.since >= RULES.STALL_MS) return;
+  fail("Only the host can " + what + ".");
+}
+function happened(s, event) {
+  s.seq += 1;
+  s.last = event;
+  if (event && event.kind === "guess") {
+    s.log.push(event);
+    if (s.log.length > RULES.LOG_MAX) s.log = s.log.slice(-RULES.LOG_MAX);
+  }
 }
 
 function clone(s) {
@@ -101,8 +128,10 @@ export function newGame(hostUid, options) {
     pack: options.pack || "general",
     phase: "lobby", round: 0, topic: "", used: [],
     players: {}, inRound: [], alive: [], answers: {}, shuffle: [], found: {},
-    turn: "", misses: 0, allowed: 1, trips: 0, tripLeft: 0, deadline: 0,
-    last: null, note: "", winners: [], credited: []
+    reader: "", shown: 0,
+    turn: "", misses: 0, allowed: 1, trips: 0, tripLeft: 0,
+    deadline: 0, since: 0, seq: 0, last: null, log: [], base: {},
+    note: "", winners: [], credited: []
   };
 }
 
@@ -142,9 +171,11 @@ function setTopic(s, args) {
   if (args.index >= 0 && s.used.indexOf(args.index) < 0) s.used.push(args.index);
 }
 
+/* The host, or any player's phone once the pause between rounds is over. */
 export function startRound(s, uid, args, now) {
   if (s.phase !== "lobby" && s.phase !== "done") fail("A round is already being played.");
-  mayMove(s, uid, args, now, "start the round");
+  if (args && args.clock) { if (!clockRanOut(s, uid, args, now)) fail("The next round has already started."); }
+  else if (uid !== s.host) fail("Only the host can start the round.");
   if (Object.keys(s.players).length < RULES.MIN_PLAYERS) fail("At least " + RULES.MIN_PLAYERS + " players are needed.");
   s = clone(s);
   setTopic(s, args);
@@ -152,9 +183,12 @@ export function startRound(s, uid, args, now) {
   s.phase = "write";
   s.inRound = seats(s);
   s.alive = []; s.answers = {}; s.shuffle = []; s.found = {};
+  s.reader = ""; s.shown = 0;
   s.turn = ""; s.misses = 0; s.allowed = 1; s.trips = 0; s.tripLeft = 0;
-  s.last = null; s.note = "";
-  s.deadline = now + RULES.WRITE_MS;
+  s.log = []; s.note = ""; s.base = {};
+  s.inRound.forEach(function (id) { s.base[id] = s.players[id].s; });
+  s.deadline = 0; s.since = now;
+  happened(s, null);
   return s;
 }
 
@@ -164,7 +198,7 @@ export function changeTopic(s, uid, args, now) {
   s = clone(s);
   setTopic(s, args);
   s.answers = {};
-  s.deadline = now + RULES.WRITE_MS;
+  s.since = now;
   return s;
 }
 
@@ -179,8 +213,8 @@ function shuffled(list, rand) {
 
 function endRound(s, now) {
   s.phase = "done";
-  s.turn = ""; s.misses = 0;
-  s.deadline = now + RULES.NEXT_MS;
+  s.turn = ""; s.reader = ""; s.misses = 0;
+  s.deadline = now + RULES.NEXT_MS; s.since = now;
   var top = leaders(s);
   if (top.length && s.players[top[0]].s >= s.target) {
     if (top.length === 1) { s.phase = "over"; s.winners = top; s.deadline = 0; }
@@ -188,7 +222,7 @@ function endRound(s, now) {
   }
 }
 
-/* Writing is over: show the answers and start the guessing. */
+/* Writing is over: hand the answers to the reader. */
 function reveal(s, now, rand) {
   var answered = s.inRound.filter(function (id) { return s.answers[id] !== undefined; });
   Object.keys(s.answers).forEach(function (id) { if (answered.indexOf(id) < 0) delete s.answers[id]; });
@@ -198,21 +232,25 @@ function reveal(s, now, rand) {
     s.note = "few";
     return;
   }
-  s.phase = "guess";
+  s.phase = "read";
   s.alive = answered;
   s.shuffle = shuffled(answered, rand || Math.random);
-  s.turn = answered[(s.round - 1) % answered.length];
-  s.misses = 0; s.allowed = 1; s.trips = 0; s.tripLeft = answered.length;
-  s.deadline = now + RULES.TURN_MS;
+  s.reader = answered[(s.round - 1) % answered.length];
+  s.shown = 1;
+  s.turn = ""; s.misses = 0; s.allowed = 1; s.trips = 0; s.tripLeft = answered.length;
+  s.since = now;
 }
 
+/* Checks an answer and, when it is the last one in, closes the writing.
+   The page uses this to check an answer before sending it as one field. */
 export function submit(s, uid, args, now, rand) {
   if (s.phase !== "write") fail("Answers are closed for this round.");
-  if (s.inRound.indexOf(uid) < 0) fail("You are in from the next round.");
+  if (s.inRound.indexOf(uid) < 0) fail("You'll play from the next round.");
   var text = clean(args && args.text, RULES.ANSWER_MAX);
   if (!text) fail("Type an answer first.");
   s = clone(s);
   s.answers[uid] = text;
+  s.since = now;
   if (s.inRound.every(function (id) { return s.answers[id] !== undefined; })) reveal(s, now, rand);
   return s;
 }
@@ -220,7 +258,7 @@ export function submit(s, uid, args, now, rand) {
 /* Phones send answers one field at a time without a transaction (see
    backend.js put), so the last one in asks for this. */
 export function allIn(s, uid, args, now, rand) {
-  if (s.phase !== "write") fail("Guessing has already started.");
+  if (s.phase !== "write") fail("The answers are already being read.");
   if (!s.players[uid]) fail("You are not in this game.");
   if (!s.inRound.length || !s.inRound.every(function (id) { return s.answers[id] !== undefined; })) fail("Still waiting for answers.");
   s = clone(s);
@@ -228,14 +266,56 @@ export function allIn(s, uid, args, now, rand) {
   return s;
 }
 
-/* The host at any time, or any player once the writing time is up. */
-export function startGuessing(s, uid, args, now, rand) {
-  if (s.phase !== "write") fail("Guessing has already started.");
-  mayMove(s, uid, args, now, "start the guessing early");
+/* Start without the players who have not answered. */
+export function closeWriting(s, uid, args, now, rand) {
+  if (s.phase !== "write") fail("The answers are already being read.");
+  hostOrStalled(s, uid, now, "start without the others");
   s = clone(s);
   reveal(s, now, rand);
   return s;
 }
+
+/* ---------- reading ---------- */
+
+/* The reader, or any player's phone when the reader has gone quiet. The
+   phone names the answer count it saw, so two phones cannot both advance. */
+function mayRead(s, uid, args, now) {
+  if (s.phase !== "read") fail("Nobody is reading right now.");
+  if (uid === s.reader) return;
+  if (args && args.auto && s.players[uid] && args.shown === s.shown && now - s.since >= RULES.READ_MS) return;
+  fail("Only the reader can do that.");
+}
+
+export function nextAnswer(s, uid, args, now) {
+  mayRead(s, uid, args, now);
+  if (s.shown >= s.shuffle.length) fail("That's all of them.");
+  s = clone(s);
+  s.shown += 1; s.since = now;
+  return s;
+}
+
+export function passReader(s, uid, args, now) {
+  if (s.phase !== "read") fail("Nobody is reading right now.");
+  if (uid !== s.reader && uid !== s.host) fail("Only the reader can do that.");
+  s = clone(s);
+  s.reader = s.alive[(s.alive.indexOf(s.reader) + 1) % s.alive.length];
+  s.since = now;
+  return s;
+}
+
+/* Once every answer has been shown, the reader guesses first. */
+export function beginGuess(s, uid, args, now) {
+  mayRead(s, uid, args, now);
+  if (s.shown < s.shuffle.length) fail("Read the rest of the answers first.");
+  s = clone(s);
+  s.phase = "guess";
+  s.turn = s.reader;
+  s.reader = "";
+  s.misses = 0; s.since = now;
+  return s;
+}
+
+/* ---------- guessing ---------- */
 
 function passTurn(s, now) {
   var i = s.alive.indexOf(s.turn);
@@ -247,7 +327,7 @@ function passTurn(s, now) {
     s.tripLeft = s.alive.length;
     s.allowed = Math.min(RULES.MAX_MISSES, 1 + Math.floor(s.trips / RULES.TRIPS_PER_STEP));
   }
-  s.deadline = now + RULES.TURN_MS;
+  s.since = now;
 }
 
 function knockOut(s, id, now) {
@@ -263,32 +343,32 @@ export function guess(s, uid, args, now) {
   if (s.turn !== uid) fail("It is not your turn.");
   var answer = args && args.answer, target = args && args.target;
   if (s.shuffle.indexOf(answer) < 0 || s.found[answer]) fail("That answer is not in play.");
-  if (answer === uid) fail("That one is yours. Pick another answer.");
+  if (answer === uid) fail("That one's yours. Pick another.");
   if (target === uid) fail("Guess someone else.");
-  if (s.alive.indexOf(target) < 0) fail("That player is already out.");
+  if (s.alive.indexOf(target) < 0) fail("That player is already caught.");
   s = clone(s);
   /* Two players who wrote the same thing are interchangeable. */
   var right = answer === target || same(s.answers[answer], s.answers[target]);
-  s.last = { by: uid, answer: answer, target: target, ok: right, skip: false };
+  happened(s, { kind: "guess", by: uid, answer: answer, target: target, ok: right });
+  s.since = now;
   if (right) {
     s.found[answer] = target;
     s.players[uid].s += 1;
-    s.deadline = now + RULES.TURN_MS;
     knockOut(s, target, now);
   } else {
     s.misses += 1;
     if (s.misses >= s.allowed) passTurn(s, now);
-    else s.deadline = now + RULES.TURN_MS;
   }
   return s;
 }
 
-/* The host at any time, or any player once the turn's time is up. */
-export function skip(s, uid, args, now) {
+/* The guesser passes their own turn; the host passes anyone's; any player
+   may once the game has been quiet for STALL_MS. */
+export function pass(s, uid, args, now) {
   if (s.phase !== "guess") fail("Nobody is guessing right now.");
-  mayMove(s, uid, args, now, "skip a turn early");
+  if (uid !== s.turn) hostOrStalled(s, uid, now, "pass someone else's turn");
   s = clone(s);
-  s.last = { by: s.turn, answer: "", target: "", ok: false, skip: true };
+  happened(s, { kind: "pass", by: s.turn, answer: "", target: uid, ok: false });
   passTurn(s, now);
   return s;
 }
@@ -297,18 +377,22 @@ export function skip(s, uid, args, now) {
 
 export function remove(s, uid, args, now, rand) {
   var id = args && args.player;
-  if (uid !== s.host) fail("Only the host can remove a player.");
-  if (id === s.host) fail("The host cannot be removed.");
+  if (uid !== s.host) fail("Only the host can take someone out.");
+  if (id === s.host) fail("The host cannot be taken out.");
   if (!s.players[id]) fail("That player has already left.");
   s = clone(s);
+  var name = s.players[id].n;
   delete s.players[id];
+  delete s.base[id];
   s.inRound = s.inRound.filter(function (x) { return x !== id; });
   s.winners = s.winners.filter(function (x) { return x !== id; });
   if (s.phase === "write") {
     delete s.answers[id];
-    if (s.inRound.every(function (x) { return s.answers[x] !== undefined; })) reveal(s, now, rand);
-  } else if (s.phase === "guess" && s.alive.indexOf(id) >= 0) {
+    if (s.inRound.length && s.inRound.every(function (x) { return s.answers[x] !== undefined; })) reveal(s, now, rand);
+  } else if ((s.phase === "read" || s.phase === "guess") && s.alive.indexOf(id) >= 0) {
     /* Their answer stays on the list as a decoy nobody can match. */
+    happened(s, { kind: "left", by: "", answer: name, target: "", ok: false });
+    if (s.reader === id) s.reader = s.alive[(s.alive.indexOf(id) + 1) % s.alive.length];
     if (s.turn === id) passTurn(s, now);
     knockOut(s, id, now);
   }
@@ -319,7 +403,7 @@ export function finish(s, uid) {
   if (uid !== s.host) fail("Only the host can end the game.");
   if (s.phase === "lobby" || s.phase === "over") fail("There is no game to end.");
   s = clone(s);
-  s.phase = "over"; s.turn = ""; s.deadline = 0; s.note = "";
+  s.phase = "over"; s.turn = ""; s.reader = ""; s.deadline = 0; s.note = "host";
   s.winners = leaders(s);
   return s;
 }

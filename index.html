@@ -9,13 +9,13 @@
   :root {
     --bg: #f6f3ee; --card: #ffffff; --ink: #1f1a33; --soft: #6b6580; --line: #e3ded4;
     --brand: #5b3fd6; --brand-ink: #ffffff; --good: #16794c; --bad: #b3312b; --gold: #b7791f;
-    --pick: #efeaff; --out: #a9a4b8;
+    --pick: #efeaff; --out: #8d879e; --turn: #5b3fd6; --turn-ink: #ffffff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #15121f; --card: #211c33; --ink: #f1eefb; --soft: #a59fbd; --line: #352e4d;
       --brand: #8f78ff; --brand-ink: #15121f; --good: #5fd39a; --bad: #ff8a80; --gold: #f2c066;
-      --pick: #33295c; --out: #6f6988;
+      --pick: #33295c; --out: #8a84a3; --turn: #8f78ff; --turn-ink: #15121f;
     }
   }
   * { box-sizing: border-box; }
@@ -23,15 +23,16 @@
   body {
     margin: 0; background: var(--bg); color: var(--ink);
     font: 17px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    padding: env(safe-area-inset-top) 16px calc(24px + env(safe-area-inset-bottom));
+    padding: env(safe-area-inset-top) 16px calc(32px + env(safe-area-inset-bottom));
   }
   main { max-width: 520px; margin: 0 auto; }
   [hidden] { display: none !important; }
-  h1 { font-size: 34px; line-height: 1.1; margin: 28px 0 4px; letter-spacing: -0.02em; }
-  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--soft); margin: 24px 0 8px; font-weight: 600; }
+  h1 { font-size: 32px; line-height: 1.1; margin: 24px 0 6px; letter-spacing: -0.02em; text-wrap: balance; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--soft); margin: 22px 0 8px; font-weight: 600; }
   p { margin: 8px 0; }
   .soft { color: var(--soft); }
-  .small { font-size: 14px; }
+  .small { font-size: 15px; }
+  .lead { font-size: 19px; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin: 12px 0; }
   input, select, button { font: inherit; color: inherit; }
   input[type=text], select {
@@ -44,120 +45,160 @@
     background: var(--card); cursor: pointer; text-align: center; font-weight: 600;
   }
   button.main { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
-  button.quiet { border-color: transparent; background: transparent; color: var(--soft); font-weight: 500; min-height: 44px; }
+  button.quiet { border-color: transparent; background: transparent; color: var(--soft); font-weight: 500; min-height: 44px; text-decoration: underline; }
   button:disabled { opacity: 0.55; cursor: default; }
   form { display: grid; gap: 10px; }
+  .stack { display: grid; gap: 10px; }
   .row { display: flex; gap: 10px; }
   .row > * { flex: 1; }
   .msg { color: var(--bad); min-height: 1.4em; }
+  ul, ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  ol.steps { list-style: decimal; padding-left: 22px; gap: 6px; }
 
-  #bar { display: flex; align-items: center; gap: 8px; padding: 10px 0 0; }
-  #bar .code { font: 700 20px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.12em; }
-  #bar button { width: auto; min-height: 44px; padding: 8px 14px; }
-  #bar .grow { flex: 1; }
+  #bar { display: flex; align-items: center; gap: 8px; padding: 10px 0 0; min-height: 54px; }
+  #barLabel { font-weight: 700; flex: 1; }
+  #bar button { width: auto; min-height: 44px; padding: 8px 16px; }
 
-  .bigcode { font: 700 44px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.14em; text-align: center; margin: 8px 0; }
-  #topic { font-size: 24px; line-height: 1.25; font-weight: 700; margin: 16px 0 6px; letter-spacing: -0.01em; }
-  #roundLine { margin-top: 18px; }
-  #clock { font-variant-numeric: tabular-nums; font-weight: 700; }
-  #clock.low { color: var(--bad); }
-  #turnLine { font-size: 20px; font-weight: 700; margin: 14px 0 2px; }
-  #turnLine.mine { color: var(--brand); }
-  #lastLine { min-height: 1.4em; }
-  #lastLine.ok { color: var(--good); }
-  #lastLine.no { color: var(--bad); }
+  .bigcode { font: 700 44px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.14em; text-align: center; margin: 6px 0 10px; }
+  canvas.qr { display: block; margin: 0 auto 10px; width: 180px; height: 180px; border-radius: 8px; background: #fff; }
+  .topic { font-size: 24px; line-height: 1.25; font-weight: 700; margin: 10px 0 8px; letter-spacing: -0.01em; text-wrap: balance; }
 
-  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-  #answerList button, #revealList li {
+  /* the top of the guess screen changes colour on your turn */
+  #turnBox { border-radius: 16px; padding: 14px 16px; margin: 12px 0; background: var(--card); border: 1px solid var(--line); }
+  #turnBox.mine { background: var(--turn); color: var(--turn-ink); border-color: var(--turn); }
+  #turnBox.mine .soft { color: inherit; opacity: 0.9; }
+  #turnHead { font-size: 26px; font-weight: 800; line-height: 1.15; margin: 0; }
+  .banner { border-left: 4px solid var(--brand); background: var(--card); padding: 10px 14px; border-radius: 0 12px 12px 0; }
+
+  #answerList button, #revealList li, #readList li, #logList li {
     text-align: left; font-weight: 500; padding: 14px; border-radius: 12px;
     border: 1px solid var(--line); background: var(--card); width: 100%;
   }
-  #answerList button[aria-pressed=true] { background: var(--pick); border-color: var(--brand); }
-  #answerList button.found { color: var(--out); text-decoration: line-through; }
-  #answerList .tag, #revealList .tag { display: block; font-size: 14px; color: var(--soft); text-decoration: none; margin-top: 2px; }
-  #whoList { grid-template-columns: 1fr 1fr; }
-  #whoList button.out { color: var(--out); text-decoration: line-through; background: transparent; }
-  #whoList button.ready { border-color: var(--brand); }
+  #answerList button.found { color: var(--out); }
+  #answerList button.found .text { text-decoration: line-through; }
+  .tag { display: block; font-size: 14px; color: var(--soft); margin-top: 2px; }
+  #logList li { padding: 10px 14px; font-size: 15px; }
+  #readBig { font-size: 28px; line-height: 1.25; font-weight: 700; padding: 28px 18px; text-align: center; text-wrap: balance; }
+  #readList li.now { border-color: var(--brand); background: var(--pick); }
 
-  #scores li, #lobbyList li {
+  .people li, #lobbyList li {
     display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px;
     background: var(--card); border: 1px solid var(--line);
   }
-  #scores .pname, #lobbyList .pname { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
-  #scores .pscore { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2ch; text-align: right; }
-  #scores li.out .pname { color: var(--out); text-decoration: line-through; }
-  #scores li.lead .pscore { color: var(--gold); }
-  #scores li.me, #lobbyList li.me { border-color: var(--brand); }
-  button.kick { width: 44px; min-height: 44px; padding: 0; flex: none; color: var(--soft); }
-  #winnerLine { font-size: 30px; font-weight: 800; line-height: 1.15; margin: 20px 0 6px; }
+  .pname { flex: 1; font-weight: 600; overflow-wrap: anywhere; }
+  .pscore { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2ch; text-align: right; }
+  .people li.me, #lobbyList li.me { border-color: var(--brand); }
+  .people li.top .pscore { color: var(--gold); }
+
+  #headline { font-size: 30px; font-weight: 800; line-height: 1.15; margin: 18px 0 4px; text-wrap: balance; }
+  #winnerLine { font-size: 34px; font-weight: 800; line-height: 1.1; margin: 22px 0 6px; text-wrap: balance; }
+
+  /* panels that slide up over the board */
+  .veil { position: fixed; inset: 0; background: rgba(15, 10, 30, 0.55); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
+  .sheet {
+    background: var(--bg); width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto; overscroll-behavior: contain;
+    border-radius: 20px 20px 0 0; padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  .sheet h3 { font-size: 20px; margin: 4px 0 10px; }
+  .quote { font-size: 20px; font-weight: 700; margin: 6px 0 14px; text-wrap: balance; }
+  #pickNames { grid-template-columns: 1fr 1fr; }
+
+  /* a result fills the screen for a moment */
+  #moment {
+    position: fixed; inset: 0; z-index: 20; background: var(--ink); color: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 28px; gap: 12px;
+  }
+  #moment.ok { background: var(--good); color: #fff; }
+  #moment.no { background: var(--bad); color: #fff; }
+  @media (prefers-color-scheme: dark) { #moment.ok, #moment.no { color: #15121f; } }
+  #momentHead { font-size: 40px; font-weight: 800; line-height: 1.1; text-wrap: balance; }
+  #momentBody { font-size: 22px; line-height: 1.3; text-wrap: balance; }
+  #momentMore { font-size: 17px; opacity: 0.9; }
+
   #toast {
     position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
     max-width: 488px; margin: 0 auto; background: var(--ink); color: var(--bg);
-    padding: 14px 16px; border-radius: 12px; text-align: center; z-index: 5;
+    padding: 14px 16px; border-radius: 12px; text-align: center; z-index: 30;
   }
 </style>
 </head>
 <body>
 <main>
 
-  <!-- Home: join by code, or sign in and start a game -->
+  <!-- Home: you need a code, not an account -->
   <section id="home">
     <h1>Who Said It</h1>
-    <p class="soft">Everyone answers the same question in secret. Then you guess who wrote what.</p>
+    <p class="soft lead">Everyone writes a secret answer. Then you guess who wrote what.</p>
 
     <div class="card">
       <form id="joinForm" autocomplete="off">
-        <label for="codeInput"><strong>Join a game</strong></label>
+        <label for="codeInput"><strong>Got a code?</strong></label>
         <input id="codeInput" type="text" inputmode="text" autocapitalize="characters" maxlength="6" placeholder="Game code" aria-describedby="homeMsg">
-        <button class="main" id="joinBtn" type="submit">Join</button>
+        <button class="main" id="joinBtn" type="submit">Join the game</button>
       </form>
       <p class="msg" id="homeMsg" role="status"></p>
     </div>
 
     <div class="card">
-      <p><strong>Start a game</strong></p>
-      <p class="soft small" id="startHint">The host signs in with Google. Players join with the code and need no account.</p>
-      <button id="startBtn" type="button" disabled>Loading…</button>
+      <p><strong>Running the game tonight?</strong></p>
+      <p class="soft small">The host signs in with Google. Everyone else just needs the code.</p>
+      <button id="startBtn" type="button" disabled>Getting ready…</button>
     </div>
 
-    <div class="card" id="account">
-      <p id="whoami" class="soft small"></p>
-      <p id="stats" class="small" hidden></p>
-      <button id="signInBtn" type="button" hidden>Sign in with Google</button>
-      <button id="signOutBtn" class="quiet" type="button" hidden>Sign out</button>
-    </div>
+    <p id="whoami" class="soft small" hidden></p>
+    <button id="signInBtn" class="quiet" type="button" hidden>Sign in to keep count of your wins</button>
+    <button id="signOutBtn" class="quiet" type="button" hidden>Sign out</button>
   </section>
 
   <!-- In a game -->
   <section id="play" hidden>
     <div id="bar">
-      <span class="soft small">Code</span>
-      <span class="code" id="codeLabel"></span>
-      <span class="grow"></span>
-      <button id="shareBtn" type="button">Invite</button>
-      <button id="leaveBtn" class="quiet" type="button">Leave</button>
+      <span id="barLabel"></span>
+      <button id="menuBtn" type="button">Menu</button>
     </div>
 
-    <!-- Character: required before anything else -->
-    <div id="character" hidden>
-      <h1>Pick your character</h1>
-      <p class="soft">This is the name everyone guesses. Say it out loud so the table knows it's you.</p>
+    <!-- Name -->
+    <div id="name" hidden>
+      <h1>What's your name tonight?</h1>
+      <p class="soft">Use your real name or a silly one. Tell the room who you are.</p>
+      <p id="midRound" class="banner" hidden>A round is on. You'll play from the next one.</p>
       <form id="nameForm" autocomplete="off">
-        <input id="nameInput" type="text" maxlength="20" placeholder="Character name" aria-label="Character name" aria-describedby="nameMsg">
-        <button class="main" type="submit">Join the game</button>
+        <input id="nameInput" type="text" maxlength="20" placeholder="Your name" aria-label="Your name" aria-describedby="nameMsg">
+        <button class="main" type="submit">I'm in</button>
+        <button id="sillyBtn" type="button">Give me a silly one</button>
       </form>
       <p class="msg" id="nameMsg" role="status"></p>
     </div>
 
+    <!-- Taken out by the host -->
+    <div id="removed" hidden>
+      <h1>You're out of this game</h1>
+      <p class="soft" id="removedLine"></p>
+      <div class="stack">
+        <button class="main" id="rejoinBtn" type="button">Rejoin</button>
+        <button id="homeBtn" type="button">Back to the start</button>
+      </div>
+    </div>
+
     <!-- Lobby -->
     <div id="lobby" hidden>
-      <p class="soft" style="text-align:center;margin-top:24px">Tell everyone this code</p>
-      <div class="bigcode" id="bigCode"></div>
-      <h2>Who's in <span id="lobbyCount"></span></h2>
+      <div id="lobbyHost" hidden>
+        <h1>Get everyone in</h1>
+        <p class="soft" id="lobbyHow"></p>
+        <div class="bigcode" id="bigCode"></div>
+        <canvas class="qr" id="lobbyQr" width="360" height="360" hidden></canvas>
+        <button id="lobbyShareBtn" type="button">Share a link</button>
+      </div>
+      <div id="lobbyGuest" hidden>
+        <h1 id="youreIn"></h1>
+        <p class="soft" id="lobbyWait"></p>
+      </div>
+      <h2 id="lobbyCount"></h2>
       <ul id="lobbyList"></ul>
       <div id="hostSetup" class="card" hidden>
         <div class="row">
-          <label class="small soft">First to
+          <label class="small soft">Play to
             <select id="targetSelect"></select>
           </label>
           <label class="small soft">Topics
@@ -165,95 +206,236 @@
           </label>
         </div>
         <p></p>
-        <button class="main" id="startGameBtn" type="button">Start the game</button>
+        <button class="main" id="startGameBtn" type="button">Everyone's in, start</button>
+        <p class="soft small" style="text-align:center">Best with 4 or more.</p>
       </div>
-      <p id="lobbyWait" class="soft" hidden>Waiting for the host to start the game.</p>
+      <div id="lobbyTeach" class="card" hidden>
+        <p><strong>How it works</strong></p>
+        <ol class="steps howto"></ol>
+      </div>
     </div>
 
-    <!-- A round: topic and clock are shared by the three steps below -->
-    <div id="round" hidden>
-      <p class="soft small" id="roundLine"></p>
-      <div id="topic"></div>
-      <p class="soft"><span id="clockLabel"></span> <span id="clock"></span></p>
-
-      <!-- Write -->
-      <div id="write" hidden>
+    <!-- Write -->
+    <div id="write" hidden>
+      <div class="topic" id="topicW"></div>
+      <p id="newTopic" class="banner" hidden></p>
+      <div id="writeMine">
+        <p class="lead">Write one answer. Keep it secret.</p>
         <form id="answerForm" autocomplete="off">
-          <input id="answerInput" type="text" maxlength="80" placeholder="Your answer" aria-label="Your answer">
-          <button class="main" id="answerBtn" type="submit">Send my answer</button>
+          <input id="answerInput" type="text" maxlength="80" placeholder="Type your answer" aria-label="Your answer">
+          <button class="main" id="answerBtn" type="submit">Send it</button>
         </form>
-        <div id="answered" class="card" hidden>
-          <p><strong>Your answer is in.</strong></p>
-          <p id="myAnswer"></p>
-          <button id="editBtn" class="quiet" type="button">Change my answer</button>
-        </div>
-        <p id="sitOut" class="card" hidden>You're in from the next round. Sit back and watch this one.</p>
-        <p id="waiting" class="soft"></p>
-        <div id="hostWrite" class="card" hidden>
-          <p class="small soft">Host</p>
-          <button id="goBtn" type="button">Start guessing now</button>
-          <p></p>
-          <button id="newTopicBtn" type="button">Different topic</button>
-          <form id="ownTopicForm" autocomplete="off" style="margin-top:10px">
-            <input id="ownTopicInput" type="text" maxlength="120" placeholder="Or type your own topic" aria-label="Your own topic">
-            <button type="submit">Use my topic</button>
-          </form>
+      </div>
+      <div id="answered" class="card" hidden>
+        <p class="lead"><strong>It's in. Poker face.</strong></p>
+        <p id="myAnswer" hidden></p>
+        <div class="row">
+          <button id="peekBtn" class="quiet" type="button">Show my answer</button>
+          <button id="editBtn" class="quiet" type="button">Change it</button>
         </div>
       </div>
+      <p id="sitOut" class="banner" hidden>You joined mid-round. Watch this one. You're in the next one.</p>
+      <p id="waiting" class="soft"></p>
+      <button id="unstickW" type="button" hidden></button>
+    </div>
 
-      <!-- Guess -->
-      <div id="guess" hidden>
-        <p id="turnLine"></p>
-        <p id="missLine" class="soft small"></p>
-        <p id="lastLine" role="status"></p>
-        <h2>Answers</h2>
-        <ul id="answerList"></ul>
-        <h2 id="whoHead">Who wrote it?</h2>
-        <ul id="whoList"></ul>
-        <div id="hostGuess" hidden>
-          <p></p>
-          <button id="skipBtn" class="quiet" type="button">Host: skip this turn</button>
+    <!-- Read -->
+    <div id="read" hidden>
+      <div id="readMine" hidden>
+        <h1>You're the reader</h1>
+        <p class="lead">Read each answer out loud. Then you guess first.</p>
+        <p class="soft small" id="topicR1"></p>
+        <div class="card" id="readBig"></div>
+        <p class="soft" style="text-align:center" id="readCount1"></p>
+        <div class="stack">
+          <button class="main" id="readNextBtn" type="button">Next answer</button>
+          <button class="quiet" id="readPassBtn" type="button">Let someone else read</button>
         </div>
       </div>
-
-      <!-- Round over -->
-      <div id="done" hidden>
-        <p id="doneLine"></p>
-        <h2>Who said it</h2>
-        <ul id="revealList"></ul>
-        <div id="hostDone" class="card" hidden>
-          <p class="small soft">Host</p>
-          <button class="main" id="nextBtn" type="button">Next round now</button>
-          <p></p>
-          <button id="endBtn" class="quiet" type="button">End the game</button>
-        </div>
+      <div id="readOthers" hidden>
+        <h1>Listen up</h1>
+        <p class="lead" id="readWho"></p>
+        <p class="soft small" id="topicR2"></p>
+        <ul id="readList"></ul>
+        <p class="soft" style="text-align:center" id="readCount2"></p>
       </div>
     </div>
 
-    <!-- Game over -->
+    <!-- Guess -->
+    <div id="guess" hidden>
+      <div id="turnBox">
+        <p id="turnHead"></p>
+        <p id="turnLine" class="soft"></p>
+        <p id="triesLine" class="soft small" hidden></p>
+      </div>
+      <p id="stateBanner" class="banner" hidden></p>
+      <p class="soft small" id="topicG"></p>
+      <ul id="answerList"></ul>
+      <button id="passBtn" class="quiet" type="button" hidden>Pass my turn</button>
+      <button id="unstickG" type="button" hidden></button>
+      <p class="soft small" id="hidingLine"></p>
+      <p class="soft small" id="caughtLine"></p>
+      <div id="logBox" hidden>
+        <h2>So far</h2>
+        <ul id="logList"></ul>
+      </div>
+    </div>
+
+    <!-- Game over (sits above the last round) -->
     <div id="over" hidden>
       <p id="winnerLine"></p>
       <p id="overLine" class="soft"></p>
       <p id="myStats" class="small" hidden></p>
-      <button class="main" id="againBtn" type="button" hidden>Play again</button>
-      <p id="againWait" class="soft" hidden>The host can start a new game.</p>
+      <button class="main" id="againBtn" type="button" hidden>Play again, same players</button>
+      <p id="againWait" class="soft" hidden></p>
     </div>
 
-    <div id="scoreBox" hidden>
-      <h2>Scores <span id="targetNote"></span></h2>
-      <ul id="scores"></ul>
+    <!-- Round over -->
+    <div id="done" hidden>
+      <div id="doneTop">
+        <p id="headline"></p>
+        <p id="underHead" class="lead"></p>
+        <p id="doneNote" class="banner" hidden></p>
+      </div>
+      <div id="hostDone" class="card" hidden>
+        <p class="small soft">Next topic</p>
+        <p id="nextTopic" style="font-weight:700"></p>
+        <div class="row">
+          <button id="swapBtn" type="button">Swap it</button>
+          <button id="ownBtn" type="button">Write my own</button>
+        </div>
+        <form id="ownTopicForm" autocomplete="off" style="margin-top:10px" hidden>
+          <input id="ownTopicInput" type="text" maxlength="120" placeholder="Type your own topic" aria-label="Your own topic">
+          <button type="submit">Use this one</button>
+        </form>
+        <p></p>
+        <button class="main" id="nextBtn" type="button"></button>
+      </div>
+      <p id="doneWait" class="soft" hidden></p>
+      <p id="autoLine" class="soft small"></p>
+      <div id="gainBox">
+        <h2>This round</h2>
+        <ul id="gainList" class="people"></ul>
+      </div>
+      <h2 id="scoresHead"></h2>
+      <ul id="scores" class="people"></ul>
+      <p id="leaderLine" class="soft small"></p>
+      <h2 id="revealHead">Who said it</h2>
+      <ul id="revealList"></ul>
     </div>
   </section>
 
+  <!-- Menu -->
+  <div class="veil" id="menuVeil" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Menu">
+      <div id="menuMain" class="stack">
+        <button id="mInvite" type="button">Let someone in</button>
+        <button id="mHow" type="button">How to play</button>
+        <button id="mScores" type="button">Scores</button>
+        <button id="mSound" type="button"></button>
+        <div id="mHost" class="card stack" hidden>
+          <p class="small soft" style="margin:0">Host</p>
+          <button id="hSkip" type="button" hidden></button>
+          <button id="hGo" type="button" hidden></button>
+          <button id="hTopic" type="button" hidden>Change the topic</button>
+          <button id="hRemove" type="button">Take someone out</button>
+          <button id="hEnd" type="button" hidden>End the game</button>
+        </div>
+        <button id="mLeave" type="button">Leave the game</button>
+        <button id="mClose" class="quiet" type="button">Close</button>
+      </div>
+      <div id="menuInvite" hidden>
+        <h3>Let someone in</h3>
+        <p class="soft" id="inviteHow"></p>
+        <div class="bigcode" id="inviteCode"></div>
+        <canvas class="qr" id="inviteQr" width="360" height="360" hidden></canvas>
+        <div class="stack">
+          <button class="main" id="inviteShareBtn" type="button">Share a link</button>
+          <button class="quiet menuBack" type="button">Back</button>
+        </div>
+      </div>
+      <div id="menuHow" hidden>
+        <h3>How to play</h3>
+        <ol class="steps howto"></ol>
+        <p></p>
+        <button class="quiet menuBack" type="button">Back</button>
+      </div>
+      <div id="menuScores" hidden>
+        <h3 id="menuScoresHead"></h3>
+        <ul id="scores2" class="people"></ul>
+        <p></p>
+        <button class="quiet menuBack" type="button">Back</button>
+      </div>
+      <div id="menuRemove" hidden>
+        <h3>Take someone out</h3>
+        <ul id="removeList" class="stack"></ul>
+        <p></p>
+        <button class="quiet menuBack" type="button">Back</button>
+      </div>
+      <div id="menuTopic" hidden>
+        <h3>Change the topic</h3>
+        <p class="soft">Answers already sent will be cleared.</p>
+        <div class="stack">
+          <button id="tRandom" type="button">Give us a different one</button>
+          <form id="tOwnForm" autocomplete="off">
+            <input id="tOwnInput" type="text" maxlength="120" placeholder="Type your own topic" aria-label="Your own topic">
+            <button type="submit">Use this one</button>
+          </form>
+          <button class="quiet menuBack" type="button">Keep it</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Who wrote this? then: say it out loud -->
+  <div class="veil" id="pickVeil" hidden>
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Your guess">
+      <div id="pickStep">
+        <h3>Who wrote this?</h3>
+        <p class="quote" id="pickAnswer"></p>
+        <ul id="pickNames"></ul>
+        <p></p>
+        <button class="quiet" id="pickBack" type="button">Pick a different answer</button>
+      </div>
+      <div id="confirmStep" hidden>
+        <h3>Say it out loud!</h3>
+        <p class="quote" id="confirmLine"></p>
+        <div class="stack">
+          <button class="main" id="confirmBtn" type="button">That's my guess</button>
+          <button class="quiet" id="confirmBack" type="button">Go back</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- A question with the consequence in its buttons -->
+  <div class="veil" id="askVeil" hidden>
+    <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="askText">
+      <p class="quote" id="askText"></p>
+      <div class="stack">
+        <button class="main" id="askYes" type="button"></button>
+        <button id="askNo" type="button"></button>
+      </div>
+    </div>
+  </div>
+
+  <div id="moment" role="status" hidden>
+    <div id="momentHead"></div>
+    <div id="momentBody"></div>
+    <div id="momentMore"></div>
+  </div>
   <div id="toast" role="alert" hidden></div>
 </main>
 
+<script src="qr.js"></script>
 <script>
 /* The page. It is handed three things and touches nothing else:
      backend  from backend.js (Firebase)
      game     game.js (the rules)
      topics   topics.js (the topic packs)
-   Every piece of text a person typed is put on screen with textContent. */
+   Every piece of text a person typed is put on screen with textContent.
+   The game state comes only from the live listener (watchGame), never from
+   the result of this phone's own write. */
 window.startWhoSaidIt = function (deps) {
   "use strict";
   var be = deps.backend, G = deps.game, T = deps.topics;
@@ -263,17 +445,35 @@ window.startWhoSaidIt = function (deps) {
   var userKnown = false;  // the first sign-in state has arrived
   var code = "";          // game this phone is in
   var s = null;           // that game's state
+  var prev = null;        // the state before the latest change, to spot events
   var stopGame = null, stopStats = null;
   var stats = null;       // { w, g } for a Google user
-  var picked = "";        // answer tapped, waiting for a character
+  var wasIn = false;      // this phone had a name in this game
+  var rejoining = false;  // taken out, and chose to come back
+  var picked = "";        // answer tapped, waiting for a name
+  var target = "";        // name tapped, waiting for "That's my guess"
   var editing = false;    // changing an answer already sent
+  var peeking = false;    // looking at an answer already sent
   var sending = false;    // a move is on its way
-  var auto = { key: "", at: 0 };   // last move this phone made for the clock
+  var nextPick = null;    // host: the topic lined up for the next round
+  var auto = { key: "", at: 0 };   // last move this phone made by itself
   var credited = "";      // game already added to saved wins
   var jitter = 900 + Math.floor(Math.random() * 900);
-  var toastTimer = 0;
+  var toastTimer = 0, momentTimer = 0, wake = null;
+  var coached = {};       // round-1 hints already shown
+  var sound = true;
+  try { sound = localStorage.getItem("wsi-sound") !== "off"; } catch (e) {}
 
   var LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  var HOWTO = [
+    "Everyone gets the same topic and writes one secret answer.",
+    "The answers are read out. Nobody knows who wrote what.",
+    "On your turn, guess who wrote one. Right? You score and go again.",
+    "Get caught and you're out of the guessing for that round. Last one hiding scores 2 extra."
+  ];
+  var TARGET_WORDS = { 5: "quick", 10: "regular", 15: "long", 20: "marathon" };
+  var SILLY_A = ["Captain", "Professor", "Sir", "Lady", "Doctor", "Major", "Granny", "Uncle", "Mayor", "Sheriff", "Count", "Agent"];
+  var SILLY_B = ["Pickle", "Waffles", "Noodle", "Biscuit", "Sprinkles", "Meatball", "Pancake", "Wiggles", "Bubbles", "Nugget", "Muffin", "Thunder"];
 
   /* ---------- small helpers ---------- */
   function make(tag, cls, text) {
@@ -284,6 +484,10 @@ window.startWhoSaidIt = function (deps) {
   }
   function show(id, on) { $(id).hidden = !on; }
   function name(uid) { return s && s.players[uid] ? s.players[uid].n : "someone who left"; }
+  function list(names) {
+    return names.length < 2 ? names.join("") : names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+  }
+  function quote(text) { return "“" + text + "”"; }
   function toast(text) {
     $("toast").textContent = text; show("toast", true);
     clearTimeout(toastTimer);
@@ -291,12 +495,29 @@ window.startWhoSaidIt = function (deps) {
   }
   function explain(e) {
     if (e && e.name === "GameError") return e.message;
-    if (e && e.code === "permission-denied") return "This phone is not allowed to do that.";
-    if (e && /popup/.test(e.code || "")) return "The Google sign-in window was closed.";
-    return "Could not reach the game. Check your connection and try again.";
+    if (e && e.code === "permission-denied") return "This phone can't do that.";
+    if (e && /popup/.test(e.code || "")) return "The Google window closed. Try again when you're ready.";
+    return "Can't reach the game. Check your internet and try again.";
   }
   function isHost() { return !!(s && me && s.host === me.uid); }
   function amIn() { return !!(s && me && s.players[me.uid]); }
+  function nextUp() {
+    if (!s || s.phase !== "guess" || s.alive.length < 2) return "";
+    return s.alive[(s.alive.indexOf(s.turn) + 1) % s.alive.length];
+  }
+  function stalled() { return !!s && Date.now() - s.since >= G.RULES.STALL_MS; }
+  function missing() { return s.inRound.filter(function (id) { return s.answers[id] === undefined; }); }
+
+  /* A question whose buttons say what will happen. */
+  var askDone = null;
+  function ask(text, yes, no) {
+    $("askText").textContent = text; $("askYes").textContent = yes; $("askNo").textContent = no;
+    show("askVeil", true);
+    return new Promise(function (resolve) { askDone = resolve; });
+  }
+  function answerAsk(v) { show("askVeil", false); var d = askDone; askDone = null; if (d) d(v); }
+  $("askYes").onclick = function () { answerAsk(true); };
+  $("askNo").onclick = function () { answerAsk(false); };
 
   /* One move from game.js, applied on the server copy of the game. */
   function act(move, args, quiet) {
@@ -306,7 +527,7 @@ window.startWhoSaidIt = function (deps) {
     return be.act(code, function (state) {
       return G[move](state, uid, args, Date.now());
     }).then(function () {
-      sending = false; render();   // the new state arrives through watchGame
+      sending = false; render();
     }, function (e) {
       sending = false; render();
       if (!quiet) toast(explain(e));
@@ -314,6 +535,105 @@ window.startWhoSaidIt = function (deps) {
     });
   }
   function quietly(p) { p.catch(function () {}); }
+
+  /* A player's own name and answer are checked here against the game as this
+     phone sees it, then written as single fields (see backend.js put). */
+  function putMine(move, args, field) {
+    var uid = me.uid, next;
+    try { next = G[move](s, uid, args, Date.now()); } catch (e) { return Promise.reject(e); }
+    var fields = [[field, uid], next[field][uid]];
+    if (field === "answers") fields.push(["since"], Date.now());
+    sending = true; render();
+    return be.put(code, fields).then(function () {
+      sending = false; render();
+    }, function (e) {
+      sending = false; render();
+      throw e;
+    });
+  }
+
+  /* ---------- your-turn signal and keeping the screen on ---------- */
+  var audio = null;
+  function buzz() {
+    if (!sound) return;
+    try { if (navigator.vibrate) navigator.vibrate([120, 80, 120]); } catch (e) {}
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      audio = audio || new Ctx();
+      var o = audio.createOscillator(), g = audio.createGain();
+      o.type = "sine"; o.frequency.value = 660;
+      g.gain.setValueAtTime(0.0001, audio.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.2, audio.currentTime + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.35);
+      o.connect(g); g.connect(audio.destination);
+      o.start(); o.stop(audio.currentTime + 0.4);
+    } catch (e) {}
+  }
+  function stayAwake() {
+    try {
+      if (!code || !navigator.wakeLock || document.visibilityState !== "visible") return;
+      navigator.wakeLock.request("screen").then(function (w) { wake = w; }, function () {});
+    } catch (e) {}
+  }
+  document.addEventListener("visibilitychange", stayAwake);
+
+  /* ---------- a result fills the screen for about three seconds ---------- */
+  function moment(kind, head, body, more) {
+    $("moment").className = kind || "";
+    $("momentHead").textContent = head; $("momentBody").textContent = body || ""; $("momentMore").textContent = more || "";
+    show("moment", true);
+    clearTimeout(momentTimer);
+    momentTimer = setTimeout(function () { show("moment", false); }, 3200);
+  }
+  $("moment").onclick = function () { clearTimeout(momentTimer); show("moment", false); };
+
+  function coach(key, text) {
+    if (s.round !== 1 || coached[key]) return "";
+    coached[key] = true;
+    return text;
+  }
+  /* Called with the state before and after a change. */
+  function announce(old, now) {
+    if (!old || !amIn()) return;
+    var uid = me.uid, more = [];
+    if (now.phase === "guess" && now.allowed > old.allowed && old.phase === "guess") {
+      more.push(now.allowed === 2 ? "Second chances! Everyone gets 2 tries a turn now." : "Third chances! Everyone gets 3 tries a turn now.");
+    }
+    if (now.seq !== old.seq && now.last) {
+      var L = now.last, ended = now.phase === "done" || now.phase === "over";
+      var up = !ended && now.turn && now.turn !== old.turn ? (now.turn === uid ? "You're up." : name(now.turn) + " is up.") : "";
+      if (L.kind === "guess") {
+        var text = now.answers[L.answer] || "", who = name(L.target), by = name(L.by);
+        if (L.ok) {
+          if (L.by === uid) more.unshift(ended ? "" : coach("right", "Right means you go again."));
+          else if (L.target !== uid) more.unshift(coach("caught", "Caught players sit out the guessing until next round."));
+          if (L.by === uid) moment("ok", "Yes!", "You caught " + who + ". +1." + (ended ? "" : " Go again."), more.filter(Boolean).join(" "));
+          else if (L.target === uid) moment("no", "Caught!", by + " found your answer.", "You're out of the guessing this round.");
+          else moment("ok", "Caught!", by + " caught " + who + ". " + quote(text), more.filter(Boolean).join(" "));
+        } else {
+          more.unshift(up, coach("wrong", "Wrong means the next person goes."));
+          if (L.by === uid) moment("no", "Nope.", who + " didn't write that.", more.filter(Boolean).join(" "));
+          else if (L.target === uid) moment("ok", "Safe!", by + " thought you wrote " + quote(text) + ".", more.filter(Boolean).join(" "));
+          else moment("no", "Nope!", by + " guessed " + who + " for " + quote(text) + ".", more.filter(Boolean).join(" "));
+        }
+      } else if (L.kind === "pass") {
+        more.unshift(up);
+        if (L.target === L.by) moment("", L.by === uid ? "You passed." : name(L.by) + " passed.", "", more.filter(Boolean).join(" "));
+        else moment("", name(L.target) + " moved things along.", "", more.filter(Boolean).join(" "));
+      } else if (L.kind === "left") {
+        moment("", L.answer + " left the game.", ended ? "" : "Their answer stays as a decoy.", "");
+      }
+    } else if (more.length) moment("", more[0], "", "");
+    /* the phone it concerns gets a buzz */
+    if (now.phase === "guess" && now.turn === uid && (old.turn !== uid || old.phase !== "guess")) buzz();
+    if (now.phase === "read" && now.reader === uid && (old.reader !== uid || old.phase !== "read")) buzz();
+    if (now.phase === "write" && old.phase === "write" && now.round === old.round && now.topic !== old.topic) {
+      $("newTopic").textContent = "New topic! " + name(now.host) + " swapped it." + (old.answers[uid] !== undefined ? " Write a new answer." : "");
+      show("newTopic", true); editing = false; peeking = false;
+    }
+    if (now.round !== old.round) { show("newTopic", false); editing = false; peeking = false; nextPick = null; show("ownTopicForm", false); }
+  }
 
   /* ---------- sign-in ---------- */
   be.onUser(function (u) {
@@ -325,29 +645,38 @@ window.startWhoSaidIt = function (deps) {
     if (changed && !me) leave();
     render();
   });
-
-  $("signInBtn").onclick = function () { quietly(be.signInGoogle().catch(function (e) { toast(explain(e)); throw e; })); };
+  $("signInBtn").onclick = function () { be.signInGoogle().catch(function (e) { toast(explain(e)); }); };
   $("signOutBtn").onclick = function () { leave(); be.signOut(); };
 
   /* ---------- joining and starting ---------- */
+  function usable(g) { return !!g && typeof g.seq === "number"; }   // games from before this version are over
   function open(c) {
     $("homeMsg").textContent = "";
     return be.signInGuest().then(function () { return be.getGame(c); }).then(function (g) {
-      if (!g) { $("homeMsg").textContent = "No game has the code " + c + ". Check it and try again."; return; }
+      if (!g) { $("homeMsg").textContent = "Can't find game " + c + ". Check the code with your host."; return; }
+      if (!usable(g)) { $("homeMsg").textContent = "That game has ended."; return; }
       if (stopGame) stopGame();
-      code = c; s = g; picked = ""; editing = false;
+      code = c; s = g; prev = null; picked = ""; target = ""; editing = false; rejoining = false; coached = {};
+      wasIn = amIn();
       try { history.replaceState(null, "", "#" + c); } catch (e) { location.hash = c; }
       try { localStorage.setItem("wsi-code", c); } catch (e) {}
       stopGame = be.watchGame(c, function (data) {
-        if (!data) { leave(); $("homeMsg").textContent = "That game is gone."; return; }
-        s = data; render();
-      }, function () { toast("Lost the connection to the game."); });
+        if (!usable(data)) { leave(); $("homeMsg").textContent = "That game has ended."; return; }
+        var old = s;
+        s = data;
+        if (amIn()) { wasIn = true; rejoining = false; }
+        announce(old, s);
+        render();
+      }, function () { toast("Lost the connection. Trying again…"); });
+      stayAwake();
       render();
     }).catch(function (e) { $("homeMsg").textContent = explain(e); });
   }
   function leave() {
     if (stopGame) { stopGame(); stopGame = null; }
-    code = ""; s = null; picked = ""; editing = false;
+    code = ""; s = null; picked = ""; target = ""; editing = false; wasIn = false;
+    closeSheets();
+    try { if (wake) wake.release(); } catch (e) {}
     try { history.replaceState(null, "", location.pathname + location.search); } catch (e) { location.hash = ""; }
     try { localStorage.removeItem("wsi-code"); } catch (e) {}
     render();
@@ -368,7 +697,7 @@ window.startWhoSaidIt = function (deps) {
   $("joinForm").onsubmit = function (ev) {
     ev.preventDefault();
     var c = $("codeInput").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (!/^[A-Z2-9]{6}$/.test(c)) { $("homeMsg").textContent = "A game code has six letters and numbers."; return; }
+    if (!/^[A-Z2-9]{6}$/.test(c)) { $("homeMsg").textContent = "A game code is six letters and numbers."; return; }
     open(c);
   };
   $("startBtn").onclick = function () {
@@ -378,65 +707,74 @@ window.startWhoSaidIt = function (deps) {
       $("homeMsg").textContent = explain(e);
     }).then(function () { render(); });
   };
-  $("leaveBtn").onclick = leave;
-  $("shareBtn").onclick = function () {
-    var link = location.origin + location.pathname + "#" + code;
-    if (navigator.share) {
-      navigator.share({ title: "Who Said It", text: "Join our game with code " + code, url: link }).catch(function () {});
-    } else if (navigator.clipboard) {
-      navigator.clipboard.writeText(link).then(function () { toast("Invite link copied."); }, function () { toast(link); });
-    } else toast(link);
-  };
 
-  /* A player's own seat and answer are checked here against the game as this
-     phone sees it, then written as single fields (see backend.js put). */
-  function putMine(move, args, field) {
-    var uid = me.uid, next;
-    try { next = G[move](s, uid, args, Date.now()); } catch (e) { return Promise.reject(e); }
-    sending = true; render();
-    return be.put(code, [field, uid], next[field][uid]).then(function () {
-      sending = false; render();
-    }, function (e) {
-      sending = false; render();
-      throw e;
-    });
+  function link() { return location.origin + location.pathname + "#" + code; }
+  function share() {
+    if (navigator.share) {
+      navigator.share({ title: "Who Said It", text: "Join our game of Who Said It. The code is " + code + ".", url: link() }).catch(function () {});
+    } else if (navigator.clipboard) {
+      navigator.clipboard.writeText(link()).then(function () { toast("Link copied."); }, function () { toast(link()); });
+    } else toast(link());
   }
+  function drawQr(id) {
+    var c = $(id);
+    try {
+      var q = window.qrcode(0, "M"); q.addData(link()); q.make();
+      var n = q.getModuleCount(), pad = 2, size = Math.floor(c.width / (n + pad * 2)), ctx = c.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.fillStyle = "#000";
+      var off = Math.floor((c.width - size * n) / 2);
+      for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) ctx.fillRect(off + k * size, off + r * size, size, size);
+      c.hidden = false;
+    } catch (e) { c.hidden = true; }
+  }
+  $("lobbyShareBtn").onclick = share;
+  $("inviteShareBtn").onclick = share;
 
   $("nameForm").onsubmit = function (ev) {
     ev.preventDefault();
     $("nameMsg").textContent = "";
     putMine("join", { name: $("nameInput").value }, "players").catch(function (e) { $("nameMsg").textContent = explain(e); });
   };
+  $("sillyBtn").onclick = function () {
+    var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
+    $("nameInput").value = pick(SILLY_A) + " " + pick(SILLY_B);
+  };
+  $("rejoinBtn").onclick = function () { rejoining = true; render(); };
+  $("homeBtn").onclick = leave;
 
   /* ---------- host setup ---------- */
   G.RULES.TARGETS.forEach(function (n) {
-    var o = make("option", "", n + " points"); o.value = String(n); $("targetSelect").appendChild(o);
+    var o = make("option", "", n + " · " + TARGET_WORDS[n]); o.value = String(n); $("targetSelect").appendChild(o);
   });
   Object.keys(T.PACKS).forEach(function (k) {
     var o = make("option", "", T.PACKS[k].label); o.value = k; $("packSelect").appendChild(o);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".howto"), function (ol) {
+    HOWTO.forEach(function (line) { ol.appendChild(make("li", "", line)); });
   });
   $("targetSelect").onchange = function () { quietly(act("setup", { target: Number($("targetSelect").value) })); };
   $("packSelect").onchange = function () { quietly(act("setup", { pack: $("packSelect").value })); };
 
   function freshTopic() { return T.pickTopic(s.pack, s.used); }
   $("startGameBtn").onclick = function () { quietly(act("startRound", freshTopic())); };
-  $("nextBtn").onclick = function () { quietly(act("startRound", freshTopic())); };
-  $("newTopicBtn").onclick = function () { quietly(act("changeTopic", freshTopic())); };
+  $("nextBtn").onclick = function () { quietly(act("startRound", nextPick || freshTopic())); };
+  $("swapBtn").onclick = function () { nextPick = freshTopic(); render(); };
+  $("ownBtn").onclick = function () { show("ownTopicForm", true); $("ownTopicInput").focus(); };
   $("ownTopicForm").onsubmit = function (ev) {
     ev.preventDefault();
-    quietly(act("changeTopic", { topic: $("ownTopicInput").value, index: -1 }).then(function () { $("ownTopicInput").value = ""; }));
+    var text = $("ownTopicInput").value.replace(/\s+/g, " ").trim();
+    if (!text) return;
+    nextPick = { topic: text, index: -1 }; $("ownTopicInput").value = ""; show("ownTopicForm", false); render();
   };
-  $("goBtn").onclick = function () { quietly(act("startGuessing")); };
-  $("skipBtn").onclick = function () { quietly(act("skip")); };
-  $("endBtn").onclick = function () { if (confirm("End the game now and show the final scores?")) quietly(act("finish")); };
   $("againBtn").onclick = function () { quietly(act("playAgain")); };
 
   /* ---------- writing ---------- */
   $("answerForm").onsubmit = function (ev) {
     ev.preventDefault();
     putMine("submit", { text: $("answerInput").value }, "answers").then(function () {
-      editing = false; $("answerInput").value = ""; render();
-      quietly(act("allIn", null, true));   // starts the guessing if this was the last answer
+      editing = false; peeking = false; $("answerInput").value = ""; show("newTopic", false); render();
+      quietly(act("allIn", null, true));   // hands the answers to the reader if this was the last one
     }, function (e) {
       toast(e && e.code === "permission-denied" ? "Answers are closed for this round." : explain(e));
     });
@@ -444,156 +782,305 @@ window.startWhoSaidIt = function (deps) {
   $("editBtn").onclick = function () {
     editing = true; $("answerInput").value = s.answers[me.uid] || ""; render(); $("answerInput").focus();
   };
+  $("peekBtn").onclick = function () { peeking = !peeking; render(); };
+  function startWithout() {
+    var names = missing().map(name);
+    ask("Start without " + list(names) + "? They'll watch this round.", "Start", "Wait").then(function (yes) {
+      if (yes) quietly(act("closeWriting"));
+    });
+  }
+  $("unstickW").onclick = startWithout;
 
-  /* ---------- the clock ---------- */
-  function clockMove() {
-    var seen = { clock: true, deadline: s.deadline };
-    if (s.phase === "write") return act("startGuessing", seen, true);
-    if (s.phase === "guess") return act("skip", seen, true);
-    if (s.phase === "done") return act("startRound", Object.assign(seen, freshTopic()), true);
-    return Promise.resolve();
+  /* ---------- reading ---------- */
+  $("readNextBtn").onclick = function () {
+    quietly(act(s.shown >= s.shuffle.length ? "beginGuess" : "nextAnswer"));
+  };
+  $("readPassBtn").onclick = function () { quietly(act("passReader")); };
+
+  /* ---------- guessing ---------- */
+  function closePick() { picked = ""; target = ""; show("pickVeil", false); }
+  $("pickBack").onclick = function () { closePick(); render(); };
+  $("confirmBack").onclick = function () { target = ""; render(); };
+  $("confirmBtn").onclick = function () {
+    var args = { answer: picked, target: target };
+    closePick();
+    quietly(act("guess", args));
+  };
+  $("passBtn").onclick = function () {
+    ask("Pass your turn?", "Pass", "Keep guessing").then(function (yes) { if (yes) quietly(act("pass")); });
+  };
+  $("unstickG").onclick = function () { quietly(act("pass")); };
+
+  /* ---------- menu ---------- */
+  var PANELS = ["menuMain", "menuInvite", "menuHow", "menuScores", "menuRemove", "menuTopic"];
+  function panel(id) { PANELS.forEach(function (p) { show(p, p === id); }); }
+  function closeSheets() { show("menuVeil", false); show("pickVeil", false); if (askDone) answerAsk(false); }
+  $("menuBtn").onclick = function () { panel("menuMain"); show("menuVeil", true); render(); };
+  $("mClose").onclick = function () { show("menuVeil", false); };
+  $("menuVeil").onclick = function (ev) { if (ev.target === $("menuVeil")) show("menuVeil", false); };
+  Array.prototype.forEach.call(document.querySelectorAll(".menuBack"), function (b) { b.onclick = function () { panel("menuMain"); }; });
+  $("mInvite").onclick = function () { panel("menuInvite"); drawQr("inviteQr"); };
+  $("mHow").onclick = function () { panel("menuHow"); };
+  $("mScores").onclick = function () { panel("menuScores"); };
+  $("mSound").onclick = function () {
+    sound = !sound;
+    try { localStorage.setItem("wsi-sound", sound ? "on" : "off"); } catch (e) {}
+    if (sound) buzz();
+    render();
+  };
+  $("mLeave").onclick = function () {
+    show("menuVeil", false);
+    ask("Leave the game? You can come back with the same code on this phone.", "Leave", "Stay").then(function (yes) { if (yes) leave(); });
+  };
+  $("hSkip").onclick = function () { show("menuVeil", false); quietly(act("pass")); };
+  $("hGo").onclick = function () { show("menuVeil", false); startWithout(); };
+  $("hTopic").onclick = function () { panel("menuTopic"); };
+  $("tRandom").onclick = function () { show("menuVeil", false); quietly(act("changeTopic", freshTopic())); };
+  $("tOwnForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var text = $("tOwnInput").value;
+    show("menuVeil", false);
+    quietly(act("changeTopic", { topic: text, index: -1 }).then(function () { $("tOwnInput").value = ""; }));
+  };
+  $("hRemove").onclick = function () { panel("menuRemove"); };
+  $("hEnd").onclick = function () {
+    show("menuVeil", false);
+    ask("End the game now? Whoever is ahead wins.", "End it", "Keep playing").then(function (yes) { if (yes) quietly(act("finish")); });
+  };
+
+  /* ---------- things phones do by themselves ---------- */
+  function once(key, wait, fn) {
+    if (auto.key === key && Date.now() - auto.at < wait) return;
+    auto = { key: key, at: Date.now() };
+    quietly(fn());
   }
   function tick() {
-    if (!s || !s.deadline || s.phase === "lobby" || s.phase === "over") { $("clock").textContent = ""; return; }
-    var left = s.deadline - Date.now();
-    var secs = Math.max(0, Math.ceil(left / 1000));
-    $("clock").textContent = Math.floor(secs / 60) + ":" + ("0" + (secs % 60)).slice(-2);
-    $("clock").className = secs <= 10 ? "low" : "";
+    if (!s || !me) return;
+    if (s.phase === "done" && s.deadline) {
+      var left = s.deadline - Date.now(), secs = Math.max(0, Math.ceil(left / 1000));
+      $("autoLine").textContent = "Starts by itself in " + secs + ".";
+    } else $("autoLine").textContent = "";
     if (!amIn() || sending) return;
-    var everyoneIn = s.phase === "write" && s.inRound.length > 0 &&
-      s.inRound.every(function (id) { return s.answers[id] !== undefined; });
-    if (everyoneIn) {
-      var k = "allin" + s.round;
-      if (auto.key !== k || Date.now() - auto.at > 4000) { auto = { key: k, at: Date.now() }; quietly(act("allIn", null, true)); }
-      return;
+    /* the phone it concerns moves first; the others a moment later in case that phone is gone */
+    var lag = isHost() ? 250 : jitter;
+    if (s.phase === "write" && s.inRound.length && !missing().length) {
+      once("allin" + s.round, 4000, function () { return act("allIn", null, true); });
+    } else if (s.phase === "done" && s.deadline && Date.now() - s.deadline >= lag) {
+      once("next" + s.round + ":" + s.deadline, 4000, function () {
+        return act("startRound", Object.assign({ clock: true, deadline: s.deadline }, isHost() && nextPick ? nextPick : freshTopic()), true);
+      });
+    } else if (s.phase === "read" && me.uid !== s.reader && Date.now() - s.since >= G.RULES.READ_MS + lag) {
+      once("read" + s.round + ":" + s.shown + ":" + s.since, 4000, function () {
+        return act(s.shown >= s.shuffle.length ? "beginGuess" : "nextAnswer", { auto: true, shown: s.shown }, true);
+      });
     }
-    /* Time is up: the phone it concerns moves first, the others a moment
-       later in case that phone is gone. game.js refuses a move made early. */
-    var first = isHost() || s.turn === me.uid;
-    if (-left < (first ? 250 : jitter)) return;
-    var key = s.phase + s.round + ":" + s.deadline;
-    if (auto.key === key && Date.now() - auto.at < 4000) return;
-    auto = { key: key, at: Date.now() };
-    quietly(clockMove());
+    /* the safety-net buttons appear without anything else changing */
+    if ((s.phase === "write" || s.phase === "guess") && stalled() !== tick.wasStalled) { tick.wasStalled = stalled(); render(); }
   }
   setInterval(tick, 250);
 
   /* ---------- drawing ---------- */
-  function drawPeople(list, withScores) {
-    var box = $(list); box.textContent = "";
+  function person(id, score) {
+    var li = make("li", id === me.uid ? "me" : "");
+    li.appendChild(make("span", "pname", s.players[id].n + (id === s.host ? " (host)" : "") + (id === me.uid ? " (you)" : "")));
+    if (score !== undefined) li.appendChild(make("span", "pscore", score));
+    return li;
+  }
+  function drawScores(id) {
+    var box = $(id); box.textContent = "";
     var ids = G.seats(s), top = 0;
-    ids.forEach(function (id) { top = Math.max(top, s.players[id].s); });
-    if (withScores) ids.sort(function (a, b) { return s.players[b].s - s.players[a].s; });
-    ids.forEach(function (id) {
-      var li = make("li");
-      var out = s.phase === "guess" && s.inRound.indexOf(id) >= 0 && s.alive.indexOf(id) < 0 && s.answers[id] !== undefined;
-      li.className = [id === me.uid ? "me" : "", out ? "out" : "", withScores && top > 0 && s.players[id].s === top ? "lead" : ""].join(" ").trim();
-      li.appendChild(make("span", "pname", s.players[id].n + (id === s.host ? " (host)" : "") + (id === me.uid ? " (you)" : "")));
-      if (withScores) li.appendChild(make("span", "pscore", String(s.players[id].s)));
-      if (isHost() && id !== s.host) {
-        var k = make("button", "kick", "✕");
-        k.type = "button";
-        k.setAttribute("aria-label", "Remove " + s.players[id].n);
-        k.onclick = function () {
-          if (confirm("Remove " + s.players[id].n + " from the game?")) quietly(act("remove", { player: id }));
-        };
-        li.appendChild(k);
-      }
+    ids.forEach(function (p) { top = Math.max(top, s.players[p].s); });
+    ids.sort(function (a, b) { return s.players[b].s - s.players[a].s; });
+    ids.forEach(function (p) {
+      var li = person(p, String(s.players[p].s));
+      if (top > 0 && s.players[p].s === top) li.className += " top";
       box.appendChild(li);
     });
   }
 
+  function drawLobby() {
+    var host = isHost(), n = Object.keys(s.players).length;
+    show("lobbyHost", host); show("lobbyGuest", !host); show("hostSetup", host); show("lobbyTeach", !host);
+    $("bigCode").textContent = code;
+    $("lobbyHow").textContent = "Scan this, or type the code at " + location.host + ".";
+    if (host && $("lobbyQr").dataset.code !== code) { $("lobbyQr").dataset.code = code; drawQr("lobbyQr"); }
+    $("youreIn").textContent = "You're in, " + name(me.uid) + ".";
+    $("lobbyWait").textContent = "Waiting for " + name(s.host) + " to start.";
+    $("lobbyCount").textContent = "In so far (" + n + ")";
+    var box = $("lobbyList"); box.textContent = "";
+    G.seats(s).forEach(function (id) { box.appendChild(person(id)); });
+    $("targetSelect").value = String(s.target); $("packSelect").value = s.pack;
+    var enough = n >= G.RULES.MIN_PLAYERS;
+    $("startGameBtn").disabled = !enough || sending;
+    $("startGameBtn").textContent = enough ? "Everyone's in, start" : "Waiting for one more player";
+  }
+
   function drawWrite() {
     var mine = s.answers[me.uid], playing = s.inRound.indexOf(me.uid) >= 0;
-    show("answerForm", playing && (mine === undefined || editing));
+    $("topicW").textContent = s.topic;
+    show("writeMine", playing && (mine === undefined || editing));
     show("answered", playing && mine !== undefined && !editing);
     show("sitOut", !playing);
-    $("myAnswer").textContent = mine === undefined ? "" : "“" + mine + "”";
-    $("answerBtn").textContent = editing ? "Send the new answer" : "Send my answer";
+    show("myAnswer", peeking);
+    $("myAnswer").textContent = mine === undefined ? "" : quote(mine);
+    $("peekBtn").textContent = peeking ? "Hide my answer" : "Show my answer";
+    $("answerBtn").textContent = editing ? "Send the new one" : "Send it";
     $("answerBtn").disabled = sending;
-    var waiting = s.inRound.filter(function (id) { return s.answers[id] === undefined; }).map(name);
-    $("waiting").textContent = waiting.length ? "Waiting on " + waiting.join(", ") + "." : "";
-    show("hostWrite", isHost());
+    var all = missing(), others = all.filter(function (id) { return id !== me.uid; });
+    var inCount = s.inRound.length - all.length;
+    $("waiting").textContent = !all.length ? "Everyone's in!" :
+      others.length > 4 ? inCount + " of " + s.inRound.length + " are in." :
+      others.length ? "Waiting for " + list(others.map(name)) + "." : "";
+    /* nothing for two minutes: every player gets the button the host has in the menu */
+    var stuck = stalled() && all.length > 0 && inCount >= 1;
+    show("unstickW", stuck);
+    if (stuck) $("unstickW").textContent = "Start without " + list(all.map(name));
+  }
+
+  function drawRead() {
+    var mine = s.reader === me.uid, n = s.shuffle.length, count = s.shown + " of " + n;
+    show("readMine", mine); show("readOthers", !mine);
+    $("topicR1").textContent = s.topic; $("topicR2").textContent = s.topic;
+    $("readBig").textContent = quote(s.answers[s.shuffle[s.shown - 1]] || "");
+    $("readCount1").textContent = s.shown >= n ? "That's all of them." : count;
+    $("readCount2").textContent = s.shown >= n ? name(s.reader) + " guesses first." : count;
+    $("readNextBtn").textContent = s.shown >= n ? "Start the guessing" : "Next answer";
+    $("readNextBtn").disabled = sending;
+    $("readWho").textContent = name(s.reader) + " is reading the answers.";
+    var box = $("readList"); box.textContent = "";
+    s.shuffle.slice(0, s.shown).forEach(function (a, i) {
+      box.appendChild(make("li", i === s.shown - 1 ? "now" : "", (i + 1) + ". " + s.answers[a]));
+    });
   }
 
   function drawGuess() {
-    var myTurn = s.turn === me.uid;
-    if (!myTurn || s.shuffle.indexOf(picked) < 0 || s.found[picked]) picked = "";
-    $("turnLine").textContent = myTurn ? "Your turn" : name(s.turn) + "'s turn";
-    $("turnLine").className = myTurn ? "mine" : "";
-    var leftMisses = s.allowed - s.misses;
-    $("missLine").textContent = (myTurn ? "Tap an answer, then tap who wrote it. " : "") +
-      (s.allowed > 1 ? leftMisses + " wrong " + (leftMisses === 1 ? "guess" : "guesses") + " left this turn." : "");
+    var uid = me.uid, myTurn = s.turn === uid, playing = s.inRound.indexOf(uid) >= 0 && s.answers[uid] !== undefined;
+    var caught = playing && s.alive.indexOf(uid) < 0, up = nextUp();
+    if (!myTurn || s.shuffle.indexOf(picked) < 0 || s.found[picked]) { picked = ""; target = ""; }
+    if (target && s.alive.indexOf(target) < 0) target = "";
 
-    var L = s.last, line = "", cls = "";
-    if (L && L.skip) line = name(L.by) + " ran out of time.";
-    else if (L) {
-      line = name(L.by) + " guessed " + name(L.target) + " for “" + (s.answers[L.answer] || "") + "”. " + (L.ok ? "Right!" : "Wrong.");
-      cls = L.ok ? "ok" : "no";
-    }
-    $("lastLine").textContent = line; $("lastLine").className = cls;
+    $("turnBox").className = myTurn ? "mine" : "";
+    $("turnHead").textContent = myTurn ? "Your turn, " + name(uid) : name(s.turn) + " is guessing";
+    $("turnLine").textContent = myTurn ? "Pick an answer. Who wrote it?" :
+      up === uid ? "You're up next." : up && up !== s.turn ? "Up next: " + name(up) : "";
+    var tries = s.allowed - s.misses;
+    show("triesLine", s.allowed > 1);
+    $("triesLine").textContent = myTurn
+      ? (s.misses ? tries + " more " + (tries === 1 ? "try." : "tries.") : "You get " + s.allowed + " tries this turn.")
+      : "Everyone gets " + s.allowed + " tries a turn now.";
+    show("stateBanner", caught || !playing);
+    $("stateBanner").textContent = caught ? "You're caught. Watch who's next." : "You're watching this round.";
+    $("topicG").textContent = s.topic;
 
-    var who = G.authors(s), list = $("answerList"); list.textContent = "";
+    var who = G.authors(s), catcher = {};
+    s.log.forEach(function (e) { if (e.ok) catcher[e.answer] = e.by; });
+    var box = $("answerList"); box.textContent = "";
     s.shuffle.forEach(function (a) {
-      var li = make("li"), b = make("button", "", s.answers[a]);
+      var li = make("li"), b = make("button");
       b.type = "button";
+      b.appendChild(make("span", "text", s.answers[a]));
       if (who[a] !== undefined) {
         b.className = "found"; b.disabled = true;
-        b.appendChild(make("span", "tag", name(who[a])));
-      } else if (a === me.uid) {
-        b.disabled = true; b.appendChild(make("span", "tag", "yours"));
+        b.appendChild(make("span", "tag", name(who[a]) + ", caught by " + name(catcher[a])));
       } else {
-        b.disabled = !myTurn || sending;
-        b.setAttribute("aria-pressed", picked === a ? "true" : "false");
-        b.onclick = function () { picked = picked === a ? "" : a; render(); };
+        if (a === uid) b.appendChild(make("span", "tag", "yours"));
+        b.onclick = function () {
+          if (s.turn !== uid) { toast("Hang on, it's " + name(s.turn) + "'s turn."); return; }
+          if (a === uid) { toast("That one's yours. Pick another."); return; }
+          if (sending) return;
+          picked = a; target = ""; render();
+        };
       }
-      li.appendChild(b); list.appendChild(li);
+      li.appendChild(b); box.appendChild(li);
     });
 
-    $("whoHead").textContent = myTurn && picked ? "Who wrote it?" : "Still in";
-    var people = $("whoList"); people.textContent = "";
-    s.inRound.forEach(function (id) {
-      if (s.answers[id] === undefined || !s.players[id]) return;
-      var li = make("li"), b = make("button", "", s.players[id].n + (id === me.uid ? " (you)" : ""));
-      b.type = "button";
-      var alive = s.alive.indexOf(id) >= 0;
-      if (!alive) b.className = "out";
-      var can = myTurn && picked && alive && id !== me.uid && !sending;
-      if (can) b.className = "ready";
-      b.disabled = !can;
-      b.onclick = function () {
-        var args = { answer: picked, target: id };
-        picked = "";
-        quietly(act("guess", args));
-      };
-      li.appendChild(b); people.appendChild(li);
+    show("passBtn", myTurn);
+    var stuck = !myTurn && !isHost() && stalled();
+    show("unstickG", stuck);
+    if (stuck) $("unstickG").textContent = "Skip " + name(s.turn) + "'s turn";
+
+    var out = s.inRound.filter(function (id) { return s.answers[id] !== undefined && s.players[id] && s.alive.indexOf(id) < 0; });
+    $("hidingLine").textContent = "Still hiding (" + s.alive.length + "): " + list(s.alive.map(name));
+    $("caughtLine").textContent = out.length ? "Caught (" + out.length + "): " + list(out.map(name)) : "";
+
+    var log = $("logList"); log.textContent = "";
+    show("logBox", s.log.length > 0);
+    s.log.slice(-5).reverse().forEach(function (e) {
+      var text = quote(s.answers[e.answer] || "");
+      log.appendChild(make("li", "", e.ok ? name(e.by) + " caught " + name(e.target) + ": " + text
+        : name(e.by) + " guessed " + name(e.target) + " for " + text + ". Nope."));
     });
-    show("hostGuess", isHost());
+
+    /* the panel: who wrote this, then say it out loud */
+    show("pickVeil", myTurn && !!picked);
+    if (myTurn && picked) {
+      show("pickStep", !target); show("confirmStep", !!target);
+      $("pickAnswer").textContent = quote(s.answers[picked]);
+      var names = $("pickNames"); names.textContent = "";
+      s.alive.forEach(function (id) {
+        if (id === uid) return;
+        var li = make("li"), b = make("button", "", s.players[id].n);
+        b.type = "button";
+        b.onclick = function () { target = id; render(); };
+        li.appendChild(b); names.appendChild(li);
+      });
+      if (target) $("confirmLine").textContent = name(target) + " wrote " + quote(s.answers[picked]);
+      $("confirmBtn").disabled = sending;
+    }
   }
 
   function drawDone() {
-    var line = "";
-    if (s.note === "few") line = "Not enough answers that round, so nobody scores.";
-    else if (s.alive.length === 1) line = name(s.alive[0]) + " was the last one standing and scores " + G.RULES.BONUS + " extra.";
-    if (s.note === "tie") line += " The top scores are level, so one more round decides it.";
-    $("doneLine").textContent = line;
-    var who = G.authors(s), list = $("revealList"); list.textContent = "";
-    s.shuffle.forEach(function (a) {
-      var li = make("li", "", s.answers[a]);
-      li.appendChild(make("span", "tag", who[a] ? name(who[a]) : "someone who left"));
-      list.appendChild(li);
+    var over = s.phase === "over", last = s.alive.length === 1 ? s.alive[0] : "";
+    show("doneTop", !over); show("hostDone", !over && isHost()); show("doneWait", !over && !isHost());
+    $("headline").textContent = s.note === "few" ? "No round this time" :
+      last === me.uid ? "Nobody caught you, " + name(last) + "!" : last ? name(last) + " was never caught!" : "Round over";
+    $("underHead").textContent = last ? "Last one hiding: +" + G.RULES.BONUS : "";
+    var note = s.note === "few" ? "Not enough answers that time. No points. Let's try another topic." : "";
+    if (s.note === "tie") {
+      var top = G.leaders(s);
+      note = list(top.map(name)) + " are tied on " + s.players[top[0]].s + ". One more round to settle it!";
+    }
+    show("doneNote", !!note); $("doneNote").textContent = note;
+
+    if (!over && isHost()) {
+      if (!nextPick) nextPick = freshTopic();
+      $("nextTopic").textContent = nextPick.topic;
+      $("nextBtn").textContent = "Start round " + (s.round + 1);
+      $("nextBtn").disabled = sending;
+    }
+    $("doneWait").textContent = "Waiting for " + name(s.host) + " to start round " + (s.round + 1) + ".";
+
+    var gains = $("gainList"), any = false; gains.textContent = "";
+    G.seats(s).forEach(function (id) {
+      var got = s.players[id].s - (s.base[id] === undefined ? s.players[id].s : s.base[id]);
+      if (got > 0) { any = true; gains.appendChild(person(id, "+" + got)); }
     });
-    show("hostDone", isHost() && s.phase === "done");
+    show("gainBox", any);
+
+    $("scoresHead").textContent = over ? "Final scores" : "Scores · first to " + s.target;
+    drawScores("scores");
+    var lead = G.leaders(s), need = lead.length === 1 ? s.target - s.players[lead[0]].s : 0;
+    $("leaderLine").textContent = !over && need > 0 && s.players[lead[0]].s > 0 ? name(lead[0]) + " needs " + need + " more to win." : "";
+
+    var who = G.authors(s), box = $("revealList"); box.textContent = "";
+    show("revealHead", s.shuffle.length > 0);
+    s.shuffle.forEach(function (a) {
+      var li = make("li");
+      li.appendChild(make("span", "text", quote(s.answers[a])));
+      li.appendChild(make("span", "tag", who[a] ? name(who[a]) : "someone who left"));
+      box.appendChild(li);
+    });
   }
 
   function drawOver() {
-    var w = s.winners.map(name);
-    $("winnerLine").textContent = !w.length ? "Game over" :
-      w.length === 1 ? w[0] + " wins!" : w.slice(0, -1).join(", ") + " and " + w[w.length - 1] + " win!";
-    $("overLine").textContent = "First to " + s.target + " points.";
+    var w = s.winners, mine = w.length === 1 && w[0] === me.uid;
+    $("winnerLine").textContent = !w.length ? "Game over" : mine ? "You win, " + name(me.uid) + "!" :
+      list(w.map(name)) + (w.length === 1 ? " wins!" : " win!");
+    $("overLine").textContent = s.note === "host" ? name(s.host) + " called it. Here's how it finished." : "First to " + s.target + ".";
     show("againBtn", isHost()); show("againWait", !isHost());
+    $("againWait").textContent = "Waiting for " + name(s.host) + " to start a new game.";
     show("myStats", !!(me.google && stats));
-    if (me.google && stats) $("myStats").textContent = "You have won " + stats.w + " of " + stats.g + " games.";
+    if (me.google && stats) $("myStats").textContent = "You've won " + stats.w + " of " + stats.g + " games.";
     var key = code + ":" + (s.created && s.created.seconds) + ":" + s.round;
     if (me.google && amIn() && s.credited.indexOf(me.uid) < 0 && credited !== key) {
       credited = key;
@@ -601,59 +1088,77 @@ window.startWhoSaidIt = function (deps) {
     }
   }
 
+  function drawMenu() {
+    $("mSound").textContent = "Sound and buzz: " + (sound ? "on" : "off");
+    $("inviteCode").textContent = code;
+    $("inviteHow").textContent = "Scan this, or type " + code + " at " + location.host + ".";
+    $("menuScoresHead").textContent = "Scores · first to " + s.target;
+    drawScores("scores2");
+    var host = isHost() && amIn(), gone = s.phase === "write" ? missing() : [];
+    show("mHost", host);
+    show("hSkip", s.phase === "guess"); $("hSkip").textContent = s.phase === "guess" ? "Skip " + name(s.turn) + "'s turn" : "";
+    show("hGo", gone.length > 0 && gone.length < s.inRound.length);
+    $("hGo").textContent = gone.length ? "Start without " + list(gone.map(name)) : "";
+    show("hTopic", s.phase === "write");
+    show("hEnd", s.phase !== "lobby" && s.phase !== "over");
+    var box = $("removeList"); box.textContent = "";
+    G.seats(s).forEach(function (id) {
+      if (id === s.host) return;
+      var li = make("li"), b = make("button", "", s.players[id].n);
+      b.type = "button";
+      b.onclick = function () {
+        var n = s.players[id] ? s.players[id].n : "";
+        show("menuVeil", false);
+        ask("Take " + n + " out of the game? Their points go too.", "Take them out", "Keep them").then(function (yes) {
+          if (yes) quietly(act("remove", { player: id }));
+        });
+      };
+      li.appendChild(b); box.appendChild(li);
+    });
+    show("hRemove", box.children.length > 0);
+  }
+
   function drawHome() {
     var google = !!(me && me.google);
     $("startBtn").disabled = !userKnown;
-    $("startBtn").textContent = !userKnown ? "Loading…" : google ? "Start a game" : "Sign in with Google to start";
+    $("startBtn").textContent = !userKnown ? "Getting ready…" : google ? "Host a game" : "Sign in and host a game";
     $("startBtn").className = google ? "main" : "";
-    $("whoami").textContent = google ? "Signed in as " + (me.name || "a Google user") + "." :
-      "Signing in is optional. With Google, your seat and your wins follow you to any phone.";
+    show("whoami", google);
+    $("whoami").textContent = google ? "Signed in as " + (me.name || "a Google user") + "." + (stats ? " Won " + stats.w + " of " + stats.g + " games." : "") : "";
     show("signInBtn", userKnown && !google);
     show("signOutBtn", google);
-    show("stats", google && !!stats);
-    if (google && stats) $("stats").textContent = "Games won: " + stats.w + " of " + stats.g + ".";
   }
 
   function render() {
     var inGame = !!(code && s && me);
     show("home", !inGame); show("play", inGame);
-    if (!inGame) { drawHome(); return; }
-    $("codeLabel").textContent = code;
-    var joined = amIn();
-    show("character", !joined);
-    show("lobby", joined && s.phase === "lobby");
-    show("round", joined && (s.phase === "write" || s.phase === "guess" || s.phase === "done" || s.phase === "over") && s.round > 0);
-    show("over", joined && s.phase === "over");
-    show("scoreBox", joined && s.phase !== "lobby");
+    if (!inGame) { closeSheets(); drawHome(); return; }
+    var joined = amIn(), out = !joined && wasIn && !rejoining, p = s.phase;
+    $("barLabel").textContent = !joined || p === "lobby" ? "Game " + code : p === "over" ? "Game over" : "Round " + s.round;
+    show("menuBtn", joined);
+    show("name", !joined && !out); show("removed", out);
+    show("lobby", joined && p === "lobby");
+    show("write", joined && p === "write");
+    show("read", joined && p === "read");
+    show("guess", joined && p === "guess");
+    show("over", joined && p === "over");
+    show("done", joined && (p === "done" || p === "over"));
+    if (p !== "guess") show("pickVeil", false);
+    if (out) { $("removedLine").textContent = name(s.host) + " took you out. If that was a mistake, hop back in."; closeSheets(); return; }
     if (!joined) {
+      show("midRound", p !== "lobby" && p !== "over");
       if (!$("nameInput").value && me.google && me.name && document.activeElement !== $("nameInput")) {
         $("nameInput").value = me.name.split(" ")[0].slice(0, 20);
       }
       return;
     }
-    if (s.phase === "lobby") {
-      $("bigCode").textContent = code;
-      $("lobbyCount").textContent = "(" + Object.keys(s.players).length + ")";
-      drawPeople("lobbyList", false);
-      show("hostSetup", isHost()); show("lobbyWait", !isHost());
-      $("targetSelect").value = String(s.target); $("packSelect").value = s.pack;
-      var enough = Object.keys(s.players).length >= G.RULES.MIN_PLAYERS;
-      $("startGameBtn").disabled = !enough || sending;
-      $("startGameBtn").textContent = enough ? "Start the game" : "Waiting for one more player";
-      return;
-    }
-    $("roundLine").textContent = "Round " + s.round;
-    $("topic").textContent = s.topic;
-    $("clockLabel").textContent = s.phase === "write" ? "Time to answer:" : s.phase === "guess" ? "Time to guess:" :
-      s.phase === "done" ? "Next round in" : "";
-    show("write", s.phase === "write"); show("guess", s.phase === "guess");
-    show("done", s.phase === "done" || s.phase === "over");
-    if (s.phase === "write") drawWrite();
-    if (s.phase === "guess") drawGuess();
-    if (s.phase === "done" || s.phase === "over") drawDone();
-    if (s.phase === "over") drawOver();
-    $("targetNote").textContent = "(first to " + s.target + ")";
-    drawPeople("scores", true);
+    if (p === "lobby") drawLobby();
+    if (p === "write") drawWrite();
+    if (p === "read") drawRead();
+    if (p === "guess") drawGuess();
+    if (p === "done" || p === "over") drawDone();
+    if (p === "over") drawOver();
+    drawMenu();
     tick();
   }
 
@@ -694,7 +1199,7 @@ if (!window.WSI_DEPS) {
     const options = window.WSI_TEST ? window.WSI_TEST(sdk) : {};
     window.startWhoSaidIt({ backend: backend.makeBackend(sdk, config, options), game, topics });
   } catch (e) {
-    document.getElementById("startBtn").textContent = "Could not load. Check your connection and reload.";
+    document.getElementById("startBtn").textContent = "Couldn't load the game. Check your internet and reload.";
   }
 }
 </script>

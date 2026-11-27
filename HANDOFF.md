@@ -6,68 +6,96 @@ this whole file before acting.
 
 ## State on 2026-11-27
 
-**Live.** The redesign is deployed at https://who-said-it-8eeaa.web.app
-(rules first, then hosting, both from branch `claude/bold-allen-05u2q8`, with
-the owner's go-ahead and a one-session Firebase CLI login).
+**Version 2 ("Read it out") is built and tested in the emulator, on branch
+`claude/bold-allen-05u2q8`. Check `git log` and the live site to see whether
+it has been deployed**; version 1 (timers, no reader) was live before it.
 
-Checked on the live site as a guest, in a phone-sized browser: the page loads
-the Firebase SDK from Google's CDN with no errors, a guest is signed in
-anonymously, and an unknown code reads as "No game has the code".
+How version 2 came about: the owner played version 1 on real phones ("It all
+works!"), then had a designer agent review the flow. The review is not in the
+repository; its conclusions are built in and summarised here. The owner's
+insight: the fun is reading aloud and pointing at people, which is lost if
+everyone types and taps silently. They tested a house rule (one person reads
+aloud, say the guess before tapping) and reported: "Reading aloud gets laughs.
+Tapping after is fine to end the turn."
 
 Next:
 
-1. The owner plays one real game on two phones. Google sign-in on a real
-   phone and a full round against the real project have not been tested.
-2. Later, delete the prototype's `rooms` block from `firestore.rules` and
-   redeploy the rules. It is unchanged and harmless until then.
-3. Anonymous test accounts from the probes (three from the prototype, one from
-   this deploy check) can be deleted in Authentication > Users.
+1. Deploy if not yet done (rules, then hosting; steps below), then the owner
+   plays one real game. A game created by version 1 cannot be continued by
+   version 2; the page says "That game has ended."
+2. Watch for the things the designer wanted tested with a real family: does
+   the reader read aloud unprompted; how long until someone notices their
+   turn; can the least confident player finish a guess alone; does anyone ask
+   who a name belongs to; what a caught player does for a minute.
+3. Later, delete the prototype's `rooms` block from `firestore.rules`.
+4. Anonymous test accounts from the probes can be deleted in
+   Authentication > Users.
 
-To deploy again: `npx firebase login --no-localhost` prints a link and a
-session ID; the owner opens the link, checks the ID, signs in, and pastes back
-a one-time code; then `npx firebase login <code>`, and
+To deploy: `npx firebase login --no-localhost` prints a link and a session
+ID; the owner opens the link, checks the ID, signs in, and pastes back a
+one-time code; then `npx firebase login <code>`, and
 `npx firebase deploy --only firestore:rules` before `--only hosting`. The
 cloud environment `who-said-it` already allows the hosts this needs.
 
 ## The game, as agreed with the owner
 
-Source of each rule is marked: **said** (owner's words), **chose** (owner picked
-it when asked, on 2026-11-27), **mine** (this session's default; the owner saw
-the list and did not object, but did not pick it).
+Source of each rule is marked: **said** (owner's words), **chose** (owner
+picked it when asked), **mine** (a session's default the owner has seen and
+not objected to).
 
 - A signed-in (Google) host creates a game and gets a six-character code.
   Anyone joins with the code; sign-in is optional for them. (said)
-- Each player picks a character name before anything else. (said) Everyone at
-  the table knows who is which character; it is just a fun name. (chose)
-- Each round has a topic. Every player sends one answer from their own phone.
-  (said) Answers appear on every phone, shuffled, once everyone has sent one.
-  (chose)
-- Players take turns guessing which character wrote which answer. Right: one
-  point and another guess. Wrong: the turn passes to the next player in join
-  order. A guessed player is out for the round and grayed out. The last
-  unguessed player scores 2 extra. (said / chose)
-- Timers: 90 seconds to write; players who have not answered sit that round
-  out. 45 seconds per turn; then the turn passes. The host can also start the
-  guessing or skip a turn early. (chose)
-- After two full trips of the turn around the table, everyone gets 2 wrong
-  guesses per turn; after two more, 3; never more. The owner's idea, and they
-  expect to tune it: "Will need to play with thresholds." (said / chose)
+- Each player gives a name before anything else: "What's your name tonight?",
+  real or silly, with a "Give me a silly one" button. Everyone at the table
+  knows who is who. (chose; replaces "Pick your character")
+- A round has four steps: **write, read, guess, scores**.
+- Write: every player sends one answer from their own phone. (said) No clock.
+  (said: "I'm rethinking any timers now, pass is now doable by host or person
+  guessing")
+- Read: a reader shows the answers one at a time on every phone and reads
+  them aloud, then guesses first. The reader rotates each round and can hand
+  the job on with "Let someone else read". (chose, after the house-rule test)
+- Guess: players take turns. Tap an answer, tap a name, then "That's my
+  guess" under the words "Say it out loud!". Right: one point and another
+  guess. Wrong: the turn moves to the next player in join order. A caught
+  player is out of the guessing for the round. The last one hiding scores 2
+  extra. (said / chose)
+- No turn clock. The guesser can pass; the host can pass anyone's turn and can
+  start the reading without players who have not answered. (said)
+- Quiet safety net: if nothing has happened for 2 minutes, every player gets
+  the button the host has (skip the turn, or start without the missing
+  players), so a missing host cannot freeze the game. If the reader does
+  nothing for 20 seconds the next answer shows itself. (chose)
+- After two full trips of the turn around the table, everyone gets 2 tries
+  per turn; after two more, 3; never more ("second chances"). The owner's
+  idea, and they expect to tune it. (said / chose)
 - First to a target score wins; the host picks 5, 10, 15 or 20, default 10.
-  It is checked at the end of a round; level top scores play another round.
-  Scores carry across rounds. (said / chose)
-- The host can remove a player at any time; mid-round their answer stays on
+  Checked at the end of a round; level top scores play another round. Scores
+  carry across rounds. (said / chose)
+- The next round starts by itself 60 seconds after a round ends; the host
+  normally starts it sooner and can swap or write the next topic first.
+  (chose)
+- The host can take a player out at any time; mid-round their answer stays on
   the list as a decoy. (chose)
 - A late joiner plays from the next round. (chose)
-- If the host is gone, timers carry the game: the next round starts by itself
-  20 seconds after a round ends. (chose)
 - A guest who signs in with Google keeps their seat on any phone and gets a
   saved count of games won. (chose)
 - Title "Who Said It"; the host picks a topic pack: General, Thanksgiving,
   Christmas. (chose)
-- Mine: the host also plays; the app draws the topic and the host can redraw
-  or type one; the first guesser rotates each round; at most 20 players; two
-  identical answers count for either writer; you cannot pick your own answer;
-  the host can end the game early; "Play again" keeps players, zeroes scores.
+- Words: hide and seek. Caught, still hiding, last one hiding, second
+  chances. The screens do not say character, seat, trip or sit out. (chose)
+- Mine: the host also plays; at most 20 players; two identical answers count
+  for either writer; you cannot pick your own answer; the host can end the
+  game early; "Play again" keeps players and zeroes scores; every guess shows
+  a three-second result on every phone, worded for the guesser, the person
+  named and everyone else; a "So far" list keeps the last five guesses;
+  scores are in the menu during a round; a buzz and a short sound on your
+  turn where the phone allows, with a switch in the menu.
+
+Not built from the designer's review, on purpose or for later: a TV screen
+with a narrator voice (the owner's "Jackbox rendition", offered as a later
+option); varying the "Things…" opening of the topics; showing real name and
+silly name together.
 
 All the numbers above are in one place: `RULES` at the top of `game.js`.
 
@@ -96,8 +124,8 @@ to win? I don't care forget it". So the simple design was built:
 ## Files
 
 - `index.html`: the page. One classic script (`startWhoSaidIt(deps)`) plus a
-  module script that loads the Firebase SDK from Google's CDN and the three
-  files below. All typed text is rendered with `textContent`. Keep it so.
+  module script that loads the Firebase SDK from Google's CDN and the files
+  below. All typed text is rendered with `textContent`. Keep it so.
 - `game.js`: the rules of play as pure functions `(state, uid, args, now)`
   that return the next state or throw a `GameError` with a message for the
   player. No Firebase, no page.
@@ -106,6 +134,8 @@ to win? I don't care forget it". So the simple design was built:
 - `backend.js`: the only file that talks to Firebase.
   `makeBackend(sdk, config, options)` takes the SDK as an argument so the
   browser and the tests share it.
+- `qr.js`: a vendored copy of `qrcode-generator` 1.4.4 (MIT, Kazuhiko Arase),
+  unchanged, for the invite QR code. The page works without it.
 - `firestore.rules`, `firebase.json`, `.firebaserc`: project
   `who-said-it-8eeaa`, Firestore Standard in `nam5`, Hosting serves the
   repository root.
@@ -121,48 +151,58 @@ How writes work, and why:
 
 - Most moves run in a Firestore transaction (`backend.act`): read the game,
   apply the move from `game.js`, write only the fields that changed.
-- A player's own seat and own answer are single-field writes with no
-  transaction (`backend.put`), because everyone does those at the same moment
-  and transactions on one document queue up (five simultaneous answers took
-  eight seconds before this change). After sending an answer the phone asks
-  for `allIn`, which starts the guessing if nobody is missing. The rules
-  refuse answer changes outside the write step.
-- Timers have no server. The game stores a `deadline`; when it passes, the
-  phone it concerns (host or turn holder) makes the move, and the other phones
-  try about a second later in case that phone is gone. A clock move names the
-  deadline it saw and `game.js` refuses it if the clock has moved on, so two
-  phones cannot both act on one expired clock. Phones use their own clocks; a
-  phone whose clock is far off will show the wrong countdown.
+- A player's own name and own answer are field writes with no transaction
+  (`backend.put`), because everyone does those at the same moment and
+  transactions on one document queue up (five simultaneous answers took eight
+  seconds before this change). After sending an answer the phone asks for
+  `allIn`, which hands the answers to the reader if nobody is missing. The
+  rules refuse answer changes outside the write step.
+- Things phones do by themselves (start the next round after the pause, show
+  the next answer when the reader is quiet) name what they saw (the deadline,
+  the answer count); `game.js` refuses the move if that has changed, so two
+  phones cannot both act. The host's phone goes first, the others about a
+  second later. Phones use their own clocks.
+- Every event (guess, pass, player taken out) bumps `seq` and is stored in
+  `last`; a phone shows the result moment when it sees `seq` change.
 - The page takes the game state only from the live listener, never from the
   result of its own write. Keep that: the result can be older than what the
   listener already delivered.
+- **The security rules have a hard limit of 1,000 evaluated expressions per
+  request**, and one 30-field document uses most of it. A non-host player's
+  guess is the most expensive path. Version 2 first hit the limit (every
+  guest's guess was refused in the emulator) and the validator was rewritten
+  to be cheap; the margin is now roughly 45 extra simple comparisons. Before
+  adding a field or a check, measure: pad the rule with N copies of
+  `after.round >= 0`, play a guest's guess in the emulator, and see where it
+  starts failing. Production may count slightly differently from the emulator.
 
 ## What is tested and what is not
 
 `npm install && npm test` (needs Java for the emulator):
 
-- `test/game.test.mjs`: 23 tests of the rules on their own.
+- `test/game.test.mjs`: 27 tests of the rules on their own.
 - `test/phones.mjs`: five simulated phones run the real page and real SDK
   against the Auth and Firestore emulators with the real rules: three rounds
-  including the timers, removal, winning, saved wins and play again; then 70
-  direct attacks on the rules. 123 checks, ending `all passed`.
+  covering reading, the guess panel, result moments, passing, both safety
+  nets, a changed topic, taking a player out, winning, saved wins and play
+  again; then about 70 direct attacks on the rules. 161 checks, ending
+  `all passed`; it ran clean six times in a row.
 
-Also done once by hand in this session: a round played in real phone-sized
+Also done once by hand for version 2: a round played in real phone-sized
 Chromium (real module loading, light and dark) against the emulators, with no
-page errors and no sideways scrolling.
+page errors, no sideways scrolling, and the QR code drawn.
 
-Not tested anywhere: a game played on the real Firebase project; the real
-Google sign-in popup on a phone; more than five phones; phones with bad
-connections or wrong clocks.
+Not tested anywhere for version 2: anything on the real Firebase project
+(including whether production counts rule expressions like the emulator); the
+buzz, sound and screen-awake on real phones (iPhones do not vibrate for web
+pages); scanning the QR code with a phone camera; more than five phones.
 
-The security rules follow Firebase's `firestore-rules-creation` skill
-(validators shared by create and update, strict field lists, size limits,
-immutable host and creation time, its attack checklist run as emulator tests).
+The security rules follow Firebase's `firestore-rules-creation` skill where
+the expression limit allows (strict field count, types, sizes, immutable host
+and creation time, per-player limits, its attack checklist as emulator tests).
 The skill is not installed in cloud sessions; it was read from a clone of the
-public repository `firebase/agent-skills` (`skills/firestore-rules-creation/
-SKILL.md`). Do the same if the plugin is missing. Firebase's compiler
-accepted them (`deploy --only firestore:rules --dry-run`) before they were
-published. The rules are a prototype: review them before sharing the game widely.
+public repository `firebase/agent-skills`. The rules are a prototype: review
+them before sharing the game widely.
 
 ## Limits to know about
 

@@ -88,11 +88,16 @@ export function makeBackend(sdk, config, options) {
         });
       }, { maxAttempts: 10 });
     },
-    /* Write one field without reading first: a player's own seat or answer.
-       Everyone does these at the same moment (joining, the last seconds of
-       the write clock), and transactions on one document would queue up. */
-    put: function (code, path, value) {
-      return sdk.updateDoc(game(code), new sdk.FieldPath(path[0], path[1]), value);
+    /* Write fields without reading first: a player's own name or answer.
+       Everyone does these at the same moment (joining, finishing an answer),
+       and transactions on one document would queue up.
+       fields is [path, value, path, value, ...], each path a list of keys. */
+    put: function (code, fields) {
+      var args = [game(code)];
+      for (var i = 0; i < fields.length; i += 2) {
+        args.push(new (Function.prototype.bind.apply(sdk.FieldPath, [null].concat(fields[i])))(), fields[i + 1]);
+      }
+      return sdk.updateDoc.apply(null, args);
     },
 
     /* ---- saved wins (Google users only) ---- */
