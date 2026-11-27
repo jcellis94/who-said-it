@@ -1,6 +1,6 @@
 # who-said-it
 
-A party game web page (`index.html` plus the Firebase adapter `backend.js`) backed by Firebase Authentication and Cloud Firestore. Run `npm install && npm test` after changing either file or `firestore.rules`. Read `HANDOFF.md` for the current state and how to work with the owner.
+A party game web page backed by Firebase Authentication and Cloud Firestore: `index.html` (the page), `game.js` (the rules of play, no Firebase), `topics.js` (topic packs) and `backend.js` (the only file that talks to Firebase). Run `npm install && npm test` after changing any of them or `firestore.rules`. Read `HANDOFF.md` for the current state and how to work with the owner.
 
 ## Agent skills
 

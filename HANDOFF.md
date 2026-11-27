@@ -4,170 +4,173 @@ You are taking over a small web project from another Claude session. The owner
 works from a phone, is not a developer, and wants short, concrete answers. Read
 this whole file before acting.
 
-## What the owner wants
+## State on 2026-11-27
 
-A free, phone-friendly web page for playing a party game modeled on The Game of
-Things at family gatherings, run the way Jackbox runs a room: one host signs in
-with Google and starts a game, which gets a six-character code; everyone else
-joins with the code and no account. All phones share one live game (round,
-answers, guessed marks, players, scores). Any number of groups can play at
-once, each with its own code.
+**Built and tested in the emulator, not deployed.** The redesign the owner asked
+for is on branch `claude/bold-allen-05u2q8`. The live site
+(https://who-said-it-8eeaa.web.app) still serves the earlier prototype, and the
+live Firestore rules are still the prototype's.
 
-The game itself: a reader reads a "Things..." topic, everyone secretly writes an
-answer on paper, the reader reads the answers aloud, and players take turns
-guessing who wrote which. A right guess scores 1 point, knocks that writer out
-of the round, and earns another guess; a wrong guess passes the turn left. The
-last unguessed writer scores 2. The reader role passes left each round.
+**To go live (needs the owner's go-ahead and a Firebase CLI login; never ask
+for credentials in chat):**
 
-## State of the work
+1. `npx firebase deploy --only firestore:rules` first. The new rules file
+   still contains the prototype's `rooms` block unchanged, so the old page
+   keeps working after this step.
+2. `npx firebase deploy --only hosting`. From here phones get the new page.
+3. Play one real game on two phones (see "Not tested" below).
+4. Later, delete the `rooms` block from `firestore.rules` and redeploy rules.
 
-Done and in this repository:
+## The game, as agreed with the owner
 
-- `index.html`: page, styles, 60 original topics and all game logic. No build
-  step. It never touches Firebase directly; it calls the adapter.
-- `backend.js`: the only file that talks to Firebase (Auth + Cloud Firestore).
-  `makeBackend(sdk, config, options)` takes the SDK functions as an argument, so
-  the same file runs in the browser (SDK imported from Google's CDN by the
-  module script at the bottom of `index.html`) and in the tests (SDK from npm).
-- `firestore.rules`: Firestore Security Rules. `firebase.json` and
-  `.firebaserc` point the Firebase CLI at them and at project
-  `who-said-it-8eeaa`.
-- `test/three-phones.mjs`: three simulated phones run the real page with the
-  real Firebase SDK against the Auth and Firestore emulators with the real
-  rules loaded, then attack the rules directly. Run `npm install && npm test`.
-  It needs Java (for the emulator) and ends with `all passed`.
+Source of each rule is marked: **said** (owner's words), **chose** (owner picked
+it when asked, on 2026-11-27), **mine** (this session's default; the owner saw
+the list and did not object, but did not pick it).
 
-Done in the real Firebase project `who-said-it-8eeaa` on 2026-11-27 (via the
-Firebase CLI, logged in by the owner for that session only):
+- A signed-in (Google) host creates a game and gets a six-character code.
+  Anyone joins with the code; sign-in is optional for them. (said)
+- Each player picks a character name before anything else. (said) Everyone at
+  the table knows who is which character; it is just a fun name. (chose)
+- Each round has a topic. Every player sends one answer from their own phone.
+  (said) Answers appear on every phone, shuffled, once everyone has sent one.
+  (chose)
+- Players take turns guessing which character wrote which answer. Right: one
+  point and another guess. Wrong: the turn passes to the next player in join
+  order. A guessed player is out for the round and grayed out. The last
+  unguessed player scores 2 extra. (said / chose)
+- Timers: 90 seconds to write; players who have not answered sit that round
+  out. 45 seconds per turn; then the turn passes. The host can also start the
+  guessing or skip a turn early. (chose)
+- After two full trips of the turn around the table, everyone gets 2 wrong
+  guesses per turn; after two more, 3; never more. The owner's idea, and they
+  expect to tune it: "Will need to play with thresholds." (said / chose)
+- First to a target score wins; the host picks 5, 10, 15 or 20, default 10.
+  It is checked at the end of a round; level top scores play another round.
+  Scores carry across rounds. (said / chose)
+- The host can remove a player at any time; mid-round their answer stays on
+  the list as a decoy. (chose)
+- A late joiner plays from the next round. (chose)
+- If the host is gone, timers carry the game: the next round starts by itself
+  20 seconds after a round ends. (chose)
+- A guest who signs in with Google keeps their seat on any phone and gets a
+  saved count of games won. (chose)
+- Title "Who Said It"; the host picks a topic pack: General, Thanksgiving,
+  Christmas. (chose)
+- Mine: the host also plays; the app draws the topic and the host can redraw
+  or type one; the first guesser rotates each round; at most 20 players; two
+  identical answers count for either writer; you cannot pick your own answer;
+  the host can end the game early; "Play again" keeps players, zeroes scores.
 
-- Web app registered; its config is in `index.html`.
-- Firestore database `(default)` created: Standard edition, location `nam5`.
-- `firestore.rules` published.
-- Google and Anonymous sign-in enabled.
-- Checked against the real project as a guest: anonymous sign-in works, an
-  unknown room reads as missing, and the rules refuse a guest creating a room,
-  listing rooms, and writing elsewhere.
+All the numbers above are in one place: `RULES` at the top of `game.js`.
 
-Not done:
+## Secrecy: what the owner decided
 
-1. **Hosting.** `firebase.json` is ready for Firebase Hosting (serves
-   `index.html` and `backend.js` at `who-said-it-8eeaa.web.app`, an address
-   already authorized for sign-in). The deploy
-   (`npx firebase deploy --only hosting`) needs the owner's explicit go-ahead
-   and a Firebase CLI login. GitHub Pages is the alternative; it also needs
-   `jcellis94.github.io` added under Authentication > Settings > Authorized
-   domains.
-2. **First real test** on two phones: host signs in with Google and starts a
-   game, guest joins by code, changes show both ways within a second or so.
-3. Three leftover anonymous test accounts in Authentication > Users from the
-   2026-11-27 probes can be deleted.
+Asked whether authorship must be hidden from a determined player, the owner
+answered: "this is a casual family game. If your talking about someone hacking
+to win? I don't care forget it". So the simple design was built:
+
+- The page never shows who wrote an unguessed answer, and shows no answers
+  until everyone has sent one.
+- The data does contain it. `answers` is keyed by the writer's id, and every
+  phone in the game receives the whole game document. A player who opens
+  developer tools can read who wrote what, and can also write scores or turns
+  directly, because the security rules check who may write and the shape of
+  the data, not the rules of play. The emulator test states this as a check
+  labelled "KNOWN LIMIT".
+- If that ever matters, the stronger design is: answer texts in a document
+  nobody can read until reveal, one author record per player readable only by
+  that player, and a two-step guess (lock the guess in publicly, then record
+  the result, which the security rules verify with `get()` on the author
+  record). Free plan, no server code. It was designed and not built.
+
+## Files
+
+- `index.html`: the page. One classic script (`startWhoSaidIt(deps)`) plus a
+  module script that loads the Firebase SDK from Google's CDN and the three
+  files below. All typed text is rendered with `textContent`. Keep it so.
+- `game.js`: the rules of play as pure functions `(state, uid, args, now)`
+  that return the next state or throw a `GameError` with a message for the
+  player. No Firebase, no page.
+- `topics.js`: the packs. Topics are original. Do not copy cards from any
+  published game.
+- `backend.js`: the only file that talks to Firebase.
+  `makeBackend(sdk, config, options)` takes the SDK as an argument so the
+  browser and the tests share it.
+- `firestore.rules`, `firebase.json`, `.firebaserc`: project
+  `who-said-it-8eeaa`, Firestore Standard in `nam5`, Hosting serves the
+  repository root.
+
+## Data
+
+- `games/{CODE}`: the whole game in one document. Fields are listed at the top
+  of `game.js`.
+- `users/{uid}`: `{ w: games won, g: games finished }`, Google users only.
+- `rooms/...`: the prototype's data. Unused by the new page.
+
+How writes work, and why:
+
+- Most moves run in a Firestore transaction (`backend.act`): read the game,
+  apply the move from `game.js`, write only the fields that changed.
+- A player's own seat and own answer are single-field writes with no
+  transaction (`backend.put`), because everyone does those at the same moment
+  and transactions on one document queue up (five simultaneous answers took
+  eight seconds before this change). After sending an answer the phone asks
+  for `allIn`, which starts the guessing if nobody is missing. The rules
+  refuse answer changes outside the write step.
+- Timers have no server. The game stores a `deadline`; when it passes, the
+  phone it concerns (host or turn holder) makes the move, and the other phones
+  try about a second later in case that phone is gone. A clock move names the
+  deadline it saw and `game.js` refuses it if the clock has moved on, so two
+  phones cannot both act on one expired clock. Phones use their own clocks; a
+  phone whose clock is far off will show the wrong countdown.
+- The page takes the game state only from the live listener, never from the
+  result of its own write. Keep that: the result can be older than what the
+  listener already delivered.
 
 ## What is tested and what is not
 
-Tested (emulator): the join and start flows, every game action syncing between
-phones, rapid taps, and 26 rule refusals. Also checked once in headless
-Chromium: the page loads the SDK modules and reaches the lobby.
+`npm install && npm test` (needs Java for the emulator):
 
-Not tested anywhere: the real Google sign-in popup on a phone, the SDK loading
-from `www.gstatic.com/firebasejs/13.4.0/` (the cloud container blocks that
-host; the files were served locally instead), and anything against the real
-project.
+- `test/game.test.mjs`: 23 tests of the rules on their own.
+- `test/phones.mjs`: five simulated phones run the real page and real SDK
+  against the Auth and Firestore emulators with the real rules: three rounds
+  including the timers, removal, winning, saved wins and play again; then 50
+  direct attacks on the rules. 103 checks, ending `all passed`. It ran clean
+  eight times in a row.
 
-## How the app works
+Also done once by hand in this session: a round played in real phone-sized
+Chromium (real module loading, light and dark) against the emulators, with no
+page errors and no sideways scrolling.
 
-- Views: `#setup` (no config), `#lobby` (join by code, or sign in and start),
-  `#game`.
-- Joining signs the phone in anonymously, then reads `rooms/<CODE>`. Starting
-  signs in with a Google popup, then creates the room. The code is also the URL
-  hash, so the invite link is `<page url>#<CODE>`; the last code is remembered
-  in `localStorage` under `things-live-code`.
-- Data (Firestore):
-  - `rooms/<CODE>`: `{ host: uid, created: timestamp, round: 1..500 }`
-  - `rooms/<CODE>/players/<id>`: `{ n: name, s: score, o: round the player was
-    guessed out in, 0 for none }`
-  - `rooms/<CODE>/answers/<id>`: `{ r: round, t: text, g: guessed }`
-  - Ids come from `newId()`: 9 base-36 timestamp characters plus 6 random ones,
-    so sorting ids gives creation order (seat order for players).
-- Three listeners per phone: the room, its players, and the answers for the
-  current round (re-subscribed when the round changes).
-- Scores change with Firestore `increment`, so taps from two phones add up.
-- Round changes are applied on the phone first. While one is unconfirmed
-  (`roundWrites > 0`), that phone ignores older round numbers arriving from the
-  database, so rapid Next taps are not undone. Keep this if you refactor.
-- All user-entered text is rendered with `textContent`. Keep it that way.
+Not tested anywhere: the new page against the real Firebase project; the real
+Google sign-in popup on a phone; the SDK loading from `www.gstatic.com` (the
+cloud container blocks that host; the files were served locally); more than
+five phones; phones with bad connections or wrong clocks.
 
-## Security model, and its limits
+The security rules were written by hand. The brief asked for the
+`firebase:firestore-rules-creation` skill; it was not available in the
+session that wrote them. Have them reviewed with that skill when it is.
 
-Everyone must be signed in: hosts with Google, guests anonymously. Only a
-Google user can create a room. Rooms can be fetched by code and never listed,
-so the code is what admits a guest. Any signed-in person who knows a code can
-run that game (round, players, scores, answers); that is deliberate. The rules
-fix field names, types and sizes, keep names and answer text immutable, limit a
-score change to -1, +1, +2 or a reset to 0, and forbid deleting rooms.
+## Limits to know about
 
-Limits: nothing caps how many players or answers a code-holder can add, rooms
-are never cleaned up, and there is no App Check. The rules are a prototype and
-should be reviewed before the page is shared widely.
-
-## Background you should know
-
-- A simpler, older version is live as a Claude artifact titled "Thanksgiving
-  Things". It has no backend and is not part of this repository. Do not merge
-  the two.
-- An earlier version of this repo used Realtime Database with no sign-in. The
-  owner replaced that with Auth + Firestore on 2026-11-27.
-- The page title is still "Thanksgiving Things" and about half the 60 topics
-  are Thanksgiving-themed. A rename to "Who Said It" and general topics has
-  been offered and not yet answered. Ask before renaming.
-- Topics are original. Do not copy cards from the real game.
-- Ideas raised but not decided: players submitting answers secretly from their
-  own phones instead of paper; topic packs for other occasions; host-only
-  controls.
+- Games are never cleaned up, and there is no App Check.
+- A removed player's phone returns to the character screen and can rejoin.
+- A guest who signs in with Google after taking a seat gets a new seat; sign
+  in first. The page only offers Google sign-in on the home screen.
+- Leftover from the prototype: three anonymous test accounts in
+  Authentication > Users can be deleted.
 
 ## How to work with the owner
 
 Lead with the result. Keep replies to a phone screen. Say plainly what is
 tested and what is not. When you need something from them (a value, a tap in a
 console), give numbered steps written for a phone browser, and explain any
-choice in plain words with a recommendation.
+choice in plain words with a recommendation. Asking a few multiple-choice
+questions at a time, each with a recommended answer, worked well.
 
-## Next version: rules agreed with the owner on 2026-11-27
+## Background
 
-The owner confirmed the live two-device game works, then asked for a redesign
-from scratch in a separate session. The current page is the prototype; the
-live site stays up until the new one is ready. The Firebase project, sign-in
-setup and hosting are reused.
-
-What the owner said, in their words where it matters:
-
-- Sign-in is optional for everyone "no matter what", and required to create a
-  game. Anyone joins a game by entering a code.
-- "Before beginning they have to say what their character name is."
-- Each player gives one response to the topic on their own phone, "anonymously
-  associated with their character".
-- "On your turn you can guess what item belongs to whom. When right it auto
-  points you." When guessed, the character is grayed out.
-
-What the owner chose when asked (each was the recommended option):
-
-- A right guess earns another guess; a wrong guess passes the turn to the next
-  player in join order.
-- A guessed player is out for the rest of the round and takes no more turns.
-  The last unguessed player scores 2 bonus points.
-- Answers appear on every phone, shuffled, once every player has submitted.
-- Redesign from scratch rather than evolve the current page.
-
-Consequences the previous session inferred (not stated by the owner): paper
-goes away, so every player needs a phone; the app enforces turns, checks
-guesses and keeps score, where today any phone can tap anything.
-
-Open, not yet asked: what a signed-in guest gets that an anonymous one does
-not; what happens when a player leaves or never answers; whether the host can
-skip or remove a player; how a game ends; the page title and topic set (see
-Background).
-
-The hard design problem: who wrote which answer must stay hidden from other
-phones until guessed, yet guesses must be checked. There is no server code, and
-Cloud Functions need the paid Blaze plan; the owner wants this free. Decide
-how much secrecy a family game needs and say plainly what the chosen design
-does and does not hide.
+- An older no-backend version is live as a Claude artifact titled
+  "Thanksgiving Things". It is not part of this repository. Do not merge them.
+- The game is modeled on The Game of Things. Mechanics only; no cards, names
+  or artwork from it.

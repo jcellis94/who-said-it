@@ -1,5 +1,6 @@
-/* The only file that talks to Firebase. index.html's game code calls the
-   functions returned here and knows nothing about Firestore or Auth.
+/* The only file that talks to Firebase. The page calls the functions returned
+   here and knows nothing about Firestore or Auth; the rules of the game live
+   in game.js and know nothing about Firebase either.
 
    makeBackend(sdk, config, options)
      sdk      the Firebase functions, passed in so this file runs unchanged in
@@ -7,10 +8,9 @@
      config   the web app's firebaseConfig
      options  { appName, googleSignIn(auth), setup(app, auth, db) } for tests
 
-   Data model (see firestore.rules):
-     rooms/{CODE}                { host, created, round }
-     rooms/{CODE}/players/{id}   { n: name, s: score, o: round guessed out in, 0 = none }
-     rooms/{CODE}/answers/{id}   { r: round, t: text, g: guessed } */
+   Data (see firestore.rules):
+     games/{CODE}   the whole game, one document (fields listed in game.js)
+     users/{uid}    { w: games won, g: games finished }, Google users only */
 
 export function makeBackend(sdk, config, options) {
   options = options || {};
@@ -23,31 +23,16 @@ export function makeBackend(sdk, config, options) {
     return sdk.signInWithPopup(a, new sdk.GoogleAuthProvider());
   };
 
-  function room(code) { return sdk.doc(db, "rooms", code); }
-  function player(code, id) { return sdk.doc(db, "rooms", code, "players", id); }
-  function answer(code, id) { return sdk.doc(db, "rooms", code, "answers", id); }
+  function game(code) { return sdk.doc(db, "games", code); }
+  function user(uid) { return sdk.doc(db, "users", uid); }
 
-  function isHost(u) {
+  function isGoogle(u) {
     return !!u && !u.isAnonymous && u.providerData.some(function (p) {
       return p.providerId === "google.com";
     });
   }
   function describe(u) {
-    return u ? { uid: u.uid, host: isHost(u), name: u.displayName || "" } : null;
-  }
-  function toMap(snapshot) {
-    var out = {};
-    snapshot.forEach(function (d) { out[d.id] = d.data(); });
-    return out;
-  }
-  function batchOver(ids, apply) {
-    var chunks = [];
-    for (var i = 0; i < ids.length; i += 400) chunks.push(ids.slice(i, i + 400));
-    return Promise.all(chunks.map(function (chunk) {
-      var b = sdk.writeBatch(db);
-      chunk.forEach(function (id) { apply(b, id); });
-      return b.commit();
-    }));
+    return u ? { uid: u.uid, google: isGoogle(u), name: u.displayName || "" } : null;
   }
 
   return {
@@ -55,68 +40,85 @@ export function makeBackend(sdk, config, options) {
     onUser: function (cb) {
       return sdk.onAuthStateChanged(auth, function (u) { cb(describe(u)); });
     },
-    signInHost: function () {
+    signInGoogle: function () {
       return googleSignIn(auth).then(function (r) { return describe(r.user); });
     },
+    /* No account: an anonymous sign-in the player never sees. */
     signInGuest: function () {
       if (auth.currentUser) return Promise.resolve(describe(auth.currentUser));
       return sdk.signInAnonymously(auth).then(function (r) { return describe(r.user); });
     },
     signOut: function () { return sdk.signOut(auth); },
 
-    /* ---- rooms ---- */
-    getRoom: function (code) {
-      return sdk.getDoc(room(code)).then(function (s) { return s.exists() ? s.data() : null; });
+    /* ---- games ---- */
+    getGame: function (code) {
+      return sdk.getDoc(game(code)).then(function (s) { return s.exists() ? s.data() : null; });
     },
-    createRoom: function (code) {
-      return sdk.setDoc(room(code), {
-        host: auth.currentUser.uid,
-        created: sdk.serverTimestamp(),
-        round: 1
+    createGame: function (code, state) {
+      return sdk.setDoc(game(code), Object.assign({}, state, { created: sdk.serverTimestamp() }));
+    },
+    watchGame: function (code, onData, onError) {
+      return sdk.onSnapshot(game(code), function (s) {
+        onData(s.exists() ? s.data() : null);
+      }, onError);
+    },
+    /* Apply one move from game.js. The transaction re-runs the move if another
+       phone changed the game first, so no move is applied to a stale state.
+       Only what the move changed is written, and players one seat at a time,
+       so two people taking a seat at the same moment do not collide. */
+    act: function (code, move) {
+      var ref = game(code);
+      return sdk.runTransaction(db, function (tx) {
+        return tx.get(ref).then(function (snap) {
+          if (!snap.exists()) throw new Error("That game no longer exists.");
+          var before = snap.data(), next = move(before), args = [];
+          function differs(a, b) { return JSON.stringify(a) !== JSON.stringify(b); }
+          Object.keys(next).forEach(function (k) {
+            if (k === "created" || k === "players" || !differs(before[k], next[k])) return;
+            args.push(new sdk.FieldPath(k), next[k]);
+          });
+          Object.keys(next.players).forEach(function (id) {
+            if (differs(before.players[id], next.players[id])) args.push(new sdk.FieldPath("players", id), next.players[id]);
+          });
+          Object.keys(before.players).forEach(function (id) {
+            if (!next.players[id]) args.push(new sdk.FieldPath("players", id), sdk.deleteField());
+          });
+          if (args.length) tx.update.apply(tx, [ref].concat(args));
+          return next;
+        });
+      }, { maxAttempts: 10 });
+    },
+    /* Write one field without reading first: a player's own seat or answer.
+       Everyone does these at the same moment (joining, the last seconds of
+       the write clock), and transactions on one document would queue up. */
+    put: function (code, path, value) {
+      return sdk.updateDoc(game(code), new sdk.FieldPath(path[0], path[1]), value);
+    },
+
+    /* ---- saved wins (Google users only) ---- */
+    watchStats: function (uid, onData) {
+      return sdk.onSnapshot(user(uid), function (s) {
+        onData(s.exists() ? s.data() : { w: 0, g: 0 });
+      }, function () { onData(null); });
+    },
+    /* Once per finished game: add it to this user's counts. */
+    creditGame: function (code) {
+      var u = auth.currentUser;
+      if (!isGoogle(u)) return Promise.resolve(false);
+      var gref = game(code), uref = user(u.uid);
+      return sdk.runTransaction(db, function (tx) {
+        return tx.get(gref).then(function (gs) {
+          return tx.get(uref).then(function (us) {
+            var g = gs.exists() ? gs.data() : null;
+            if (!g || g.phase !== "over" || !g.players[u.uid] || g.credited.indexOf(u.uid) >= 0) return false;
+            var have = us.exists() ? us.data() : { w: 0, g: 0 };
+            var won = g.winners.indexOf(u.uid) >= 0;
+            tx.set(uref, { w: have.w + (won ? 1 : 0), g: have.g + 1 });
+            tx.update(gref, { credited: g.credited.concat([u.uid]) });
+            return true;
+          });
+        });
       });
-    },
-    setRound: function (code, n) { return sdk.updateDoc(room(code), { round: n }); },
-
-    /* ---- live updates: each returns a function that stops listening ---- */
-    watchRoom: function (code, onData, onError) {
-      return sdk.onSnapshot(room(code), { includeMetadataChanges: true }, function (s) {
-        onData(s.exists() ? s.data() : null, !s.metadata.fromCache);
-      }, onError);
-    },
-    watchPlayers: function (code, onData, onError) {
-      return sdk.onSnapshot(sdk.collection(db, "rooms", code, "players"), function (s) {
-        onData(toMap(s));
-      }, onError);
-    },
-    watchAnswers: function (code, round, onData, onError) {
-      var q = sdk.query(sdk.collection(db, "rooms", code, "answers"), sdk.where("r", "==", round));
-      return sdk.onSnapshot(q, function (s) { onData(toMap(s)); }, onError);
-    },
-
-    /* ---- players ---- */
-    addPlayer: function (code, id, name) {
-      return sdk.setDoc(player(code, id), { n: name, s: 0, o: 0 });
-    },
-    removePlayer: function (code, id) { return sdk.deleteDoc(player(code, id)); },
-    bumpScore: function (code, id, delta) {
-      return sdk.updateDoc(player(code, id), { s: sdk.increment(delta) });
-    },
-    zeroScores: function (code, ids) {
-      return batchOver(ids, function (b, id) { b.update(player(code, id), { s: 0 }); });
-    },
-    setOut: function (code, id, round) {
-      return sdk.updateDoc(player(code, id), { o: round });
-    },
-
-    /* ---- answers ---- */
-    addAnswer: function (code, id, round, text) {
-      return sdk.setDoc(answer(code, id), { r: round, t: text, g: false });
-    },
-    setGuessed: function (code, id, on) {
-      return sdk.updateDoc(answer(code, id), { g: on });
-    },
-    clearAnswers: function (code, ids) {
-      return batchOver(ids, function (b, id) { b.delete(answer(code, id)); });
     }
   };
 }

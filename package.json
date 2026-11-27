@@ -1,9 +1,9 @@
 {
   "name": "who-said-it",
   "private": true,
-  "description": "Party game web page. index.html and backend.js are served as they are; this file only exists for the tests.",
+  "description": "Party game web page. index.html, backend.js, game.js and topics.js are served as they are; this file only exists for the tests.",
   "scripts": {
-    "test": "firebase emulators:exec --only auth,firestore --project demo-who-said-it \"node test/three-phones.mjs\""
+    "test": "node --test test/game.test.mjs && firebase emulators:exec --only auth,firestore --project demo-who-said-it \"node test/phones.mjs\""
   },
   "devDependencies": {
     "firebase": "13.4.0",
