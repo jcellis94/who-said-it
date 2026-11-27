@@ -1,0 +1,185 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Who signs in:
+//   - The HOST signs in with Google and creates a room.
+//   - GUESTS join with the room code and are signed in anonymously
+//     (Firebase Anonymous Auth, no account).
+//   - Everyone in a room may run the game: change the round, add and
+//     remove players, keep score, add answers and mark them guessed.
+//   - Knowing the six-character code is what admits a guest, so room
+//     codes can be fetched one at a time but never listed.
+//
+// Collection: rooms
+// Document ID: six characters, A-Z and 2-9 (the game code)
+// Fields:
+//   - host: string (required, immutable) - uid of the Google user who created it
+//   - created: timestamp (required, immutable) - server time at creation
+//   - round: int (required, 1..500) - the round every phone shows
+//
+// Collection: rooms/{code}/players
+// Document ID: 9 characters 0-9a-z then 6 characters A-Z2-9 (sorts by creation time)
+// Fields:
+//   - n: string (required, immutable, 1..24 chars) - player name
+//   - s: int (required, 0..100000) - score
+//   - o: int (required, 0..500) - round in which this player was guessed out, 0 for none
+//
+// Collection: rooms/{code}/answers
+// Document ID: same pattern as players
+// Fields:
+//   - r: int (required, immutable, 1..500) - round the answer belongs to
+//   - t: string (required, immutable, 1..80 chars) - the answer text
+//   - g: bool (required) - true once the answer has been guessed
+//
+// No document holds an email address or any other personal detail.
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Signed in at all (Google host or anonymous guest).
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Signed in with a Google account.
+    function isGoogleUser() {
+      return isAuthenticated() &&
+        request.auth.token.firebase.sign_in_provider == 'google.com';
+    }
+
+    function isValidCode(code) {
+      return code.matches('^[A-Z2-9]{6}$');
+    }
+
+    function isValidId(id) {
+      return id.matches('^[0-9a-z]{9}[A-Z2-9]{6}$');
+    }
+
+    // The room this player or answer belongs to must exist.
+    function roomExists(code) {
+      return isValidCode(code) &&
+        exists(/databases/$(database)/documents/rooms/$(code));
+    }
+
+    function hasExactly(data, fields) {
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields);
+    }
+
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function isIntBetween(value, low, high) {
+      return value is int && value >= low && value <= high;
+    }
+
+    // ===============================================================
+    // Domain Validators (used by both create and update)
+    // ===============================================================
+
+    function isValidRoom(data) {
+      return hasExactly(data, ['host', 'created', 'round']) &&
+        data.host is string && data.host.size() >= 1 && data.host.size() <= 128 &&
+        data.created is timestamp &&
+        isIntBetween(data.round, 1, 500);
+    }
+
+    function isValidPlayer(data) {
+      return hasExactly(data, ['n', 's', 'o']) &&
+        data.n is string && data.n.size() >= 1 && data.n.size() <= 24 &&
+        isIntBetween(data.s, 0, 100000) &&
+        isIntBetween(data.o, 0, 500);
+    }
+
+    function isValidAnswer(data) {
+      return hasExactly(data, ['r', 't', 'g']) &&
+        isIntBetween(data.r, 1, 500) &&
+        data.t is string && data.t.size() >= 1 && data.t.size() <= 80 &&
+        data.g is bool;
+    }
+
+    // A score moves by -1, +1 or +2 per tap, or is reset to zero.
+    function isValidScoreChange() {
+      return request.resource.data.s == resource.data.s ||
+        request.resource.data.s == 0 ||
+        (request.resource.data.s - resource.data.s) in [-1, 1, 2];
+    }
+
+    // ===============================================================
+    // Rooms
+    // ===============================================================
+
+    match /rooms/{code} {
+      // One room at a time, by its code. Listing is never allowed, so
+      // nobody can discover other groups' codes.
+      allow get: if isAuthenticated() && isValidCode(code);
+      allow list: if false;
+
+      // Only a Google-signed-in host creates a room, and only as themselves.
+      allow create: if isGoogleUser() &&
+        isValidCode(code) &&
+        isValidRoom(request.resource.data) &&
+        request.resource.data.host == request.auth.uid &&
+        request.resource.data.created == request.time &&
+        request.resource.data.round == 1;
+
+      // Anyone in the room moves the round. Nothing else changes.
+      allow update: if isAuthenticated() &&
+        isValidRoom(request.resource.data) &&
+        changedOnly(['round']);
+
+      allow delete: if false;
+
+      // ===============================================================
+      // Players
+      // ===============================================================
+
+      match /players/{playerId} {
+        allow read: if isAuthenticated() && roomExists(code);
+
+        allow create: if isAuthenticated() && roomExists(code) &&
+          isValidId(playerId) &&
+          isValidPlayer(request.resource.data) &&
+          request.resource.data.s == 0 &&
+          request.resource.data.o == 0;
+
+        // The name is fixed; the score and the "out" mark change.
+        allow update: if isAuthenticated() && roomExists(code) &&
+          isValidPlayer(request.resource.data) &&
+          changedOnly(['s', 'o']) &&
+          isValidScoreChange();
+
+        allow delete: if isAuthenticated() && roomExists(code);
+      }
+
+      // ===============================================================
+      // Answers
+      // ===============================================================
+
+      match /answers/{answerId} {
+        allow read: if isAuthenticated() && roomExists(code);
+
+        allow create: if isAuthenticated() && roomExists(code) &&
+          isValidId(answerId) &&
+          isValidAnswer(request.resource.data) &&
+          request.resource.data.g == false;
+
+        // Only the guessed mark changes.
+        allow update: if isAuthenticated() && roomExists(code) &&
+          isValidAnswer(request.resource.data) &&
+          changedOnly(['g']);
+
+        allow delete: if isAuthenticated() && roomExists(code);
+      }
+    }
+  }
+}

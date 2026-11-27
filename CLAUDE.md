@@ -1,6 +1,6 @@
 # who-said-it
 
-A one-file party game web page (`index.html`) backed by Firebase Realtime Database. Read `HANDOFF.md` for the current state and how to work with the owner.
+A party game web page (`index.html` plus the Firebase adapter `backend.js`) backed by Firebase Authentication and Cloud Firestore. Run `npm install && npm test` after changing either file or `firestore.rules`. Read `HANDOFF.md` for the current state and how to work with the owner.
 
 ## Agent skills
 

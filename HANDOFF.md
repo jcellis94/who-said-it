@@ -1,16 +1,17 @@
-# Handoff: "Who Said It" party game (room-code version)
+# Handoff: "Who Said It" party game
 
 You are taking over a small web project from another Claude session. The owner
-works from a phone, is not a developer, and wants short, concrete answers. This
-file is everything the previous session knew. Read it all before acting.
+works from a phone, is not a developer, and wants short, concrete answers. Read
+this whole file before acting.
 
 ## What the owner wants
 
 A free, phone-friendly web page for playing a party game modeled on The Game of
-Things at family gatherings. One person starts a game and gets a six-character
-code; everyone who joins with the code shares one live game (round, answers,
-guessed marks, players, scores). Any number of groups can play at once, each
-with its own code. No accounts for players.
+Things at family gatherings, run the way Jackbox runs a room: one host signs in
+with Google and starts a game, which gets a six-character code; everyone else
+joins with the code and no account. All phones share one live game (round,
+answers, guessed marks, players, scores). Any number of groups can play at
+once, each with its own code.
 
 The game itself: a reader reads a "Things..." topic, everyone secretly writes an
 answer on paper, the reader reads the answers aloud, and players take turns
@@ -22,110 +23,102 @@ last unguessed writer scores 2. The reader role passes left each round.
 
 Done and in this repository:
 
-- `index.html`: the whole app in one file (HTML, CSS, JS, 60 original topics).
-  No build step, no dependencies. Talks to Firebase Realtime Database over its
-  REST API (`fetch` for writes, `EventSource` for the live stream).
-- `database.rules.json`: Realtime Database security rules.
-- `test/three-phones.js`: simulation of three phones against an in-memory mock
-  of the Firebase REST + streaming API. Passes. Run with
-  `npm i jsdom && node test/three-phones.js`; every numbered line should read
-  as a pass (compare against the expectations listed under "Test" below).
+- `index.html`: page, styles, 60 original topics and all game logic. No build
+  step. It never touches Firebase directly; it calls the adapter.
+- `backend.js`: the only file that talks to Firebase (Auth + Cloud Firestore).
+  `makeBackend(sdk, config, options)` takes the SDK functions as an argument, so
+  the same file runs in the browser (SDK imported from Google's CDN by the
+  module script at the bottom of `index.html`) and in the tests (SDK from npm).
+- `firestore.rules`: Firestore Security Rules. `firebase.json` and
+  `.firebaserc` point the Firebase CLI at them and at project
+  `who-said-it-8eeaa`.
+- `test/three-phones.mjs`: three simulated phones run the real page with the
+  real Firebase SDK against the Auth and Firestore emulators with the real
+  rules loaded, then attack the rules directly. Run `npm install && npm test`.
+  It needs Java (for the emulator) and ends with `all passed`.
 
-Not done:
+Not done (all need the owner's Firebase console, which no session has had
+access to):
 
-1. **Database address.** `index.html` has one placeholder, `"__DB_URL__"`, on
-   the `var DB_URL = ...` line. Replace it with the real address. Until then
-   the page shows an "Almost ready" panel and nothing else.
-2. **Firebase side is unconfirmed.** The owner created Firebase project
-   "Who-said-it", project ID `who-said-it-8eeaa`. The likely address is
-   `https://who-said-it-8eeaa-default-rtdb.firebaseio.com`, but when the
-   previous session requested `/rooms/AAAAAA.json` there it got a 4xx error.
-   So either the Realtime Database instance does not exist yet (a new project
-   has none; it is a different product from Cloud Firestore), or the rules in
-   `database.rules.json` are not published. The owner was last using the
-   "Gemini in Firebase" panel to do these two things and report the exact URL.
-   Ask the owner for that report; do not assume the URL pattern.
-3. **Hosting.** Plan: GitHub Pages from this repository's default branch,
-   serving `index.html` from the root. Enable Pages, then give the owner the
-   URL.
-4. **First real test.** Nothing has run against a real Firebase database or on
-   a real phone. After hosting, check: with the rules published,
-   `GET <db>/rooms/AAAAAA.json` returns `null` with status 200; starting a game
-   on one device and joining by code on another shows changes both ways within
-   a second or so.
+1. **Register a web app** in project `who-said-it-8eeaa` and paste its
+   `apiKey` and `appId` into the `THINGS_FIREBASE_CONFIG` block near the bottom
+   of `index.html`. Until then the page shows an "Almost ready" panel. These
+   values are public by design.
+2. **Authentication**: enable the Google and Anonymous sign-in providers, and
+   add the hosting domain (`jcellis94.github.io` for GitHub Pages) under
+   Authentication > Settings > Authorized domains.
+3. **Firestore**: create the database (Standard edition is what the emulator
+   test ran against) and publish `firestore.rules`.
+4. **Hosting**: GitHub Pages from the default branch, serving the repo root.
+   `index.html` and `backend.js` must both be served.
+5. **First real test** on two phones: host signs in and starts a game, guest
+   joins by code, changes show both ways within a second or so.
+
+## What is tested and what is not
+
+Tested (emulator): the join and start flows, every game action syncing between
+phones, rapid taps, and 26 rule refusals. Also checked once in headless
+Chromium: the page loads the SDK modules and reaches the lobby.
+
+Not tested anywhere: the real Google sign-in popup on a phone, the SDK loading
+from `www.gstatic.com/firebasejs/13.4.0/` (the cloud container blocks that
+host; the files were served locally instead), and anything against the real
+project.
 
 ## How the app works
 
-- Views: `#setup` (no database configured), `#lobby` (join by code or start a
-  game), `#game`.
-- A room lives at `/rooms/<CODE>` where CODE matches `^[A-Z2-9]{6}$`. The code
-  is also the URL hash, so the invite link is `<page url>#<CODE>`; the last
-  code is remembered in `localStorage` under `things-live-code`.
-- Room data:
-  - `created`: number (ms)
-  - `round`: number, 1 to 60 (index into TOPICS)
-  - `players/<id>`: `{ n: name, s: score }`
-  - `answers/r<round>/<id>`: `{ t: text, g: guessed? }`
-  - `out/r<round>/<playerId>`: `true` while that player is guessed this round
-  - Ids come from `newId()`: base-36 timestamp plus random characters, so
-    sorting keys gives creation order (seat order for players). Round keys are
-    prefixed with `r` on purpose: purely numeric keys can come back from
-    Firebase as arrays.
-- Every change goes through `write(path, value)`: update the local cache,
-  re-render, then `PUT` that path. The stream echoes it to every phone.
-- `pending` + `incoming()` guard against a real bug found in testing: with
-  network lag, the echo of an older write would briefly undo a newer local one,
-  so rapid +1 taps lost points and an answer added right after tapping Next
-  landed in the wrong round. While a path has unechoed local writes, older
-  values arriving for it are skipped. Stale entries are swept after 5 seconds
-  and trigger a full re-fetch (`resync`). `canon()` compares values with sorted
-  keys because the server may reorder object keys. Keep this logic if you
-  refactor.
+- Views: `#setup` (no config), `#lobby` (join by code, or sign in and start),
+  `#game`.
+- Joining signs the phone in anonymously, then reads `rooms/<CODE>`. Starting
+  signs in with a Google popup, then creates the room. The code is also the URL
+  hash, so the invite link is `<page url>#<CODE>`; the last code is remembered
+  in `localStorage` under `things-live-code`.
+- Data (Firestore):
+  - `rooms/<CODE>`: `{ host: uid, created: timestamp, round: 1..500 }`
+  - `rooms/<CODE>/players/<id>`: `{ n: name, s: score, o: round the player was
+    guessed out in, 0 for none }`
+  - `rooms/<CODE>/answers/<id>`: `{ r: round, t: text, g: guessed }`
+  - Ids come from `newId()`: 9 base-36 timestamp characters plus 6 random ones,
+    so sorting ids gives creation order (seat order for players).
+- Three listeners per phone: the room, its players, and the answers for the
+  current round (re-subscribed when the round changes).
+- Scores change with Firestore `increment`, so taps from two phones add up.
+- Round changes are applied on the phone first. While one is unconfirmed
+  (`roundWrites > 0`), that phone ignores older round numbers arriving from the
+  database, so rapid Next taps are not undone. Keep this if you refactor.
 - All user-entered text is rendered with `textContent`. Keep it that way.
 
 ## Security model, and its limits
 
-The code is the only gate. The rules allow unauthenticated read and write to
-any room whose six-character code is known, and nothing above `/rooms/<CODE>`
-is readable, so codes cannot be listed. Validation caps string lengths and
-rejects unknown fields. This is deliberate: the owner wants no sign-in for
-players. It suits a party game and nothing private. Firebase may email a
-warning about open rules; that is expected. The rules have not been published
-to a real database yet, so a syntax complaint from the console is possible:
-fix the syntax, keep the intent.
+Everyone must be signed in: hosts with Google, guests anonymously. Only a
+Google user can create a room. Rooms can be fetched by code and never listed,
+so the code is what admits a guest. Any signed-in person who knows a code can
+run that game (round, players, scores, answers); that is deliberate. The rules
+fix field names, types and sizes, keep names and answer text immutable, limit a
+score change to -1, +1, +2 or a reset to 0, and forbid deleting rooms.
 
-Free-tier facts checked on 2026-11-26: the Spark plan allows 100 simultaneous
-Realtime Database connections; each open phone holds one.
-
-## Test
-
-`test/three-phones.js` expectations: lobby shows first; an unknown code is
-refused with a message; starting a game yields a valid code, sets the hash and
-goes Live; a second phone joins from the link; players, round and answers
-added on phone A appear on B; marks and scores made on B appear on A; five
-rapid +1 taps give 5 on both phones; three rapid Next taps then an immediate
-answer end on the same round everywhere with the answer in that round; the
-next round clears "out" marks; remove-player and zero-scores propagate; a late
-joiner typing the code in lowercase gets current state; leaving returns to the
-lobby; no HTML from user text is injected; an unconfigured page shows setup.
+Limits: nothing caps how many players or answers a code-holder can add, rooms
+are never cleaned up, and there is no App Check. The rules are a prototype and
+should be reviewed before the page is shared widely.
 
 ## Background you should know
 
 - A simpler, older version is live as a Claude artifact titled "Thanksgiving
-  Things". It has no backend: the owner's phone republishes the page to "sync".
-  It was the stopgap for Thanksgiving 2026 and is not part of this repository.
-  Do not try to merge the two.
+  Things". It has no backend and is not part of this repository. Do not merge
+  the two.
+- An earlier version of this repo used Realtime Database with no sign-in. The
+  owner replaced that with Auth + Firestore on 2026-11-27.
 - The page title is still "Thanksgiving Things" and about half the 60 topics
-  are Thanksgiving-themed. The owner named the Firebase project "who said it",
-  so a rename and a more general topic set are likely requests. Ask before
-  renaming.
+  are Thanksgiving-themed. A rename to "Who Said It" and general topics has
+  been offered and not yet answered. Ask before renaming.
 - Topics are original. Do not copy cards from the real game.
 - Ideas raised but not decided: players submitting answers secretly from their
-  own phones instead of paper (would need per-player identity and a reveal
-  step); topic packs for other occasions.
+  own phones instead of paper; topic packs for other occasions; host-only
+  controls.
 
 ## How to work with the owner
 
 Lead with the result. Keep replies to a phone screen. Say plainly what is
-tested and what is not. When you need something from them (a URL, a tap in a
-console), give numbered steps written for a phone browser.
+tested and what is not. When you need something from them (a value, a tap in a
+console), give numbered steps written for a phone browser, and explain any
+choice in plain words with a recommendation.
