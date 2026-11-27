@@ -322,6 +322,23 @@ test("winning: level leaders at the target play another round", () => {
   assert.equal(still.phase, "done"); assert.equal(still.note, "tie");
 });
 
+test("a game that ends carries no note from the round before", () => {
+  let t = guessing(["Ann", "Bob", "Cy"], { target: 5 });
+  t.players.h.s = 2; t.players.bob.s = 6;
+  t = G.guess(G.guess(t, "h", { answer: "bob", target: "bob" }, 1), "h", { answer: "cy", target: "cy" }, 1);
+  assert.equal(t.note, "tie");
+  const settled = G.remove(t, "h", { player: "bob" }, 2);
+  assert.equal(settled.phase, "over"); assert.equal(settled.note, "", "the tie note goes when the tie is settled");
+  // the tie-break round starts, one tied leader is taken out while writing, and the round goes void
+  let w = G.startRound(t, "h", { topic: "T2" }, 3);
+  w = G.remove(w, "h", { player: "bob" }, 4);
+  w = G.closeWriting(w, "h", null, 5);
+  assert.equal(w.phase, "over"); assert.deepEqual(w.winners, ["h"]);
+  assert.equal(w.note, "", "no 'not enough answers' note on the winner's screen");
+  // an ordinary void round still says so
+  assert.equal(G.closeWriting(writing(["Ann", "Bob", "Cy"]), "h", null, 5).note, "few");
+});
+
 test("second chances count trips of the players still hiding", () => {
   let s = guessing(["Ann", "Bob", "Cy", "Dee", "Eve", "Fay"]);
   for (const id of ["bob", "cy", "dee"]) s = G.guess(s, "h", { answer: id, target: id }, 1);

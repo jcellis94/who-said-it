@@ -235,7 +235,7 @@ function reveal(s, now, rand) {
   if (answered.length < 2) {
     s.alive = []; s.shuffle = [];
     endRound(s, now);
-    s.note = "few";
+    if (s.phase === "done") s.note = "few";   // not when the game has just ended
     return;
   }
   /* Straight to guessing: every phone shows all the answers at once. */

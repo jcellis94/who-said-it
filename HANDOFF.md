@@ -221,7 +221,7 @@ How writes work, and why:
 
 `npm install && npm test` (needs Java for the emulator):
 
-- `test/game.test.mjs`: 33 tests of the rules on their own.
+- `test/game.test.mjs`: 34 tests of the rules on their own.
 - `test/backend.test.mjs`: 3 tests of sign-in on reload, against a stand-in SDK.
 - `test/phones.mjs`: five simulated phones run the real page and real SDK
   against the Auth and Firestore emulators with the real rules: three rounds
