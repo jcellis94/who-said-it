@@ -212,6 +212,9 @@ them before sharing the game widely.
 
 ## Limits to know about
 
+- Hosting sends `Cache-Control: no-cache` for the page and scripts (set in
+  `firebase.json`), so a phone picks up a new version on its next load. Before
+  that was added the default was one hour, and phones showed old screens.
 - Games are never cleaned up, and there is no App Check.
 - A removed player's phone returns to the character screen and can rejoin.
 - A guest who signs in with Google after taking a seat gets a new seat; sign
