@@ -26,10 +26,10 @@ Next:
 
 1. The owner plays one real game. A game created by version 1 cannot be continued by
    version 2; the page says "That game has ended."
-2. Watch for the things the designer wanted tested with a real family: does
-   the reader read aloud unprompted; how long until someone notices their
-   turn; can the least confident player finish a guess alone; does anyone ask
-   who a name belongs to; what a caught player does for a minute.
+2. Watch for the things the designer wanted tested with a real family: how
+   long until someone notices their turn; can the least confident player
+   finish a guess alone; does anyone ask who a name belongs to; what a caught
+   player does for a minute.
 3. Later, delete the prototype's `rooms` block from `firestore.rules`.
 4. Anonymous test accounts from the probes can be deleted in
    Authentication > Users.
@@ -169,7 +169,7 @@ How writes work, and why:
   (`backend.put`), because everyone does those at the same moment and
   transactions on one document queue up (five simultaneous answers took eight
   seconds before this change). After sending an answer the phone asks for
-  `allIn`, which hands the answers to the reader if nobody is missing. The
+  `allIn`, which starts the guessing if nobody is missing. The
   rules refuse answer changes outside the write step.
 - A phone that starts the next round for the clock names the deadline it saw;
   `game.js` refuses the move if that has changed, so two phones cannot both
