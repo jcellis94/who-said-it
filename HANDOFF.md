@@ -37,22 +37,30 @@ Done and in this repository:
   rules loaded, then attack the rules directly. Run `npm install && npm test`.
   It needs Java (for the emulator) and ends with `all passed`.
 
-Not done (all need the owner's Firebase console, which no session has had
-access to):
+Done in the real Firebase project `who-said-it-8eeaa` on 2026-11-27 (via the
+Firebase CLI, logged in by the owner for that session only):
 
-1. **Register a web app** in project `who-said-it-8eeaa` and paste its
-   `apiKey` and `appId` into the `THINGS_FIREBASE_CONFIG` block near the bottom
-   of `index.html`. Until then the page shows an "Almost ready" panel. These
-   values are public by design.
-2. **Authentication**: enable the Google and Anonymous sign-in providers, and
-   add the hosting domain (`jcellis94.github.io` for GitHub Pages) under
-   Authentication > Settings > Authorized domains.
-3. **Firestore**: create the database (Standard edition is what the emulator
-   test ran against) and publish `firestore.rules`.
-4. **Hosting**: GitHub Pages from the default branch, serving the repo root.
-   `index.html` and `backend.js` must both be served.
-5. **First real test** on two phones: host signs in and starts a game, guest
-   joins by code, changes show both ways within a second or so.
+- Web app registered; its config is in `index.html`.
+- Firestore database `(default)` created: Standard edition, location `nam5`.
+- `firestore.rules` published.
+- Google and Anonymous sign-in enabled.
+- Checked against the real project as a guest: anonymous sign-in works, an
+  unknown room reads as missing, and the rules refuse a guest creating a room,
+  listing rooms, and writing elsewhere.
+
+Not done:
+
+1. **Hosting.** `firebase.json` is ready for Firebase Hosting (serves
+   `index.html` and `backend.js` at `who-said-it-8eeaa.web.app`, an address
+   already authorized for sign-in). The deploy
+   (`npx firebase deploy --only hosting`) needs the owner's explicit go-ahead
+   and a Firebase CLI login. GitHub Pages is the alternative; it also needs
+   `jcellis94.github.io` added under Authentication > Settings > Authorized
+   domains.
+2. **First real test** on two phones: host signs in with Google and starts a
+   game, guest joins by code, changes show both ways within a second or so.
+3. Three leftover anonymous test accounts in Authentication > Users from the
+   2026-11-27 probes can be deleted.
 
 ## What is tested and what is not
 
