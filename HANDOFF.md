@@ -204,7 +204,11 @@ How writes work, and why:
   host vote was added). Before
   adding a field or a check, measure: pad the rule with N copies of
   `after.round >= 0`, play a guest's guess in the emulator, and see where it
-  starts failing. Production may count slightly differently from the emulator.
+  starts failing. Production may count differently from the emulator, so
+  before publishing a rules change run `node test/prod-rules-check.mjs
+  firestore.rules 4`: it asks Firebase's own rules engine about a guest's
+  moves without touching the database (needs the CLI login). On 2026-11-27 it
+  allowed every guest move for 2, 3 and 4 players.
 
 ## What is tested and what is not
 
@@ -237,10 +241,14 @@ them before sharing the game widely.
 
 ## Limits to know about
 
-- The module script in `index.html` loads `game.js`, `backend.js` and
-  `topics.js` with a `?v=N` suffix. **Bump N whenever one of them changes.**
-  The owner hit a new page running an old `game.js`: the page let them bluff
-  with their own answer and the old rules refused it at the last step.
+- **Bump `window.WSI_VERSION` in `index.html` with every publish that changes
+  the page or its scripts.** The scripts are loaded with `?v=<version>`, and
+  every open phone compares its version with the site's once a minute, when
+  it comes back to the front, and after any refused move; if they differ it
+  reloads itself (or says so and waits, if the player is typing). Why: the
+  owner's brother, on a phone that had not been reloaded after a publish,
+  got "This phone can't do that" on a guess. The old page was writing fields
+  the new security rules no longer accept.
 - Hosting sends `Cache-Control: no-cache` for the page and scripts (set in
   `firebase.json`), so a phone picks up a new version on its next load. Before
   that was added the default was one hour, and phones showed old screens.

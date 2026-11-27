@@ -417,6 +417,10 @@
    Every piece of text a person typed is put on screen with textContent.
    The game state comes only from the live listener (watchGame), never from
    the result of this phone's own write. */
+/* The version of the page and its scripts. Change it with every publish that
+   changes index.html, game.js, backend.js or topics.js. Phones compare it with
+   the copy on the site and reload themselves when it differs. */
+window.WSI_VERSION = "7";
 window.startWhoSaidIt = function (deps) {
   "use strict";
   var be = deps.backend, G = deps.game, T = deps.topics;
@@ -475,7 +479,7 @@ window.startWhoSaidIt = function (deps) {
   }
   function explain(e) {
     if (e && e.name === "GameError") return e.message;
-    if (e && e.code === "permission-denied") return "This phone can't do that.";
+    if (e && e.code === "permission-denied") { setTimeout(checkVersion, 0); return "This phone can't do that. Reload the page and try again."; }
     if (e && /popup/.test(e.code || "")) return "The Google window closed. Try again when you're ready.";
     return "Can't reach the game. Check your internet and try again.";
   }
@@ -1139,6 +1143,29 @@ window.startWhoSaidIt = function (deps) {
     tick();
   }
 
+  /* ---------- a phone left open picks up a newer version ---------- */
+  /* An open tab keeps running the page it loaded. If the site has moved on,
+     this phone would send moves the game no longer accepts ("This phone can't
+     do that"), so it reloads itself; the game and the seat are on the server. */
+  var stale = false;
+  function typing() {
+    var a = document.activeElement;
+    return !!a && (a.tagName === "INPUT") && a.value !== "";
+  }
+  function checkVersion() {
+    if (stale) { if (!typing()) location.reload(); return; }
+    if (!window.fetch || document.visibilityState === "hidden") return;
+    fetch(location.pathname + "?check=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (html) {
+      var m = /WSI_VERSION = "(\d+)"/.exec(html);
+      if (!m || m[1] === window.WSI_VERSION) return;
+      stale = true;
+      if (typing()) toast("A newer version of the game is ready. It will load when you've sent this.");
+      else location.reload();
+    }).catch(function () {});
+  }
+  setInterval(checkVersion, 60000);
+  document.addEventListener("visibilitychange", checkVersion);
+
   /* ---------- start: an invite link or the last game on this phone ---------- */
   var wanted = location.hash.replace(/^#/, "").toUpperCase();
   if (!/^[A-Z2-9]{6}$/.test(wanted)) {
@@ -1162,9 +1189,8 @@ const config = {
 };
 if (!window.WSI_DEPS) {
   const cdn = "https://www.gstatic.com/firebasejs/13.4.0/";
-  /* Change this whenever game.js, backend.js or topics.js changes, so a phone
-     never runs a new page with an old copy of them. */
-  const version = "?v=6";
+  /* A new page never runs with an old copy of these files. */
+  const version = "?v=" + window.WSI_VERSION;
   try {
     const [app, auth, store, backend, game, topics] = await Promise.all([
       import(cdn + "firebase-app.js"),
