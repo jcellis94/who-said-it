@@ -49,7 +49,7 @@ function backend(googleSub) {
 function phone(hash, h) {
   const dom = new JSDOM(html, {
     runScripts: "dangerously", url: "https://host.example/things/" + (hash || ""),
-    beforeParse(w) { if (h) w.THINGS_BACKEND = h.be; }
+    beforeParse(w) { if (h) w.THINGS_BACKEND = h.be; else w.THINGS_FIREBASE_CONFIG = { apiKey: "" }; }
   });
   return { w: dom.window, d: dom.window.document, h };
 }
