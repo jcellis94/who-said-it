@@ -6,14 +6,12 @@ this whole file before acting.
 
 ## State on 2026-11-27
 
-**Version 2 is live; check `git log` against the site for what is deployed.**
-The site is at https://who-said-it-8eeaa.web.app,
-deployed from branch `claude/bold-allen-05u2q8` (rules, then hosting) with the
-owner's go-ahead. Checked on the live site as a guest: the page loads with no
-errors and an unknown code reads "Can't find game". No real game has been
-played on it yet. If a guest's guess is refused on the real project, suspect
-the expression limit (see Data) and redeploy the previous commit's hosting and
-rules while fixing it.
+**Version 2 is live** at https://who-said-it-8eeaa.web.app (page version 7:
+`window.WSI_VERSION` in `index.html`). The owner and their brother have
+played it on real phones and reported "Seems fine." To see whether the site
+matches the repository, compare the served files with the checkout, for
+example `curl -s https://who-said-it-8eeaa.web.app/game.js | sha1sum`.
+Deploys need the owner's explicit "publish" each time, rules before hosting.
 
 How version 2 came about: the owner played version 1 on real phones ("It all
 works!"), then had a designer agent review the flow. The review is not in the
