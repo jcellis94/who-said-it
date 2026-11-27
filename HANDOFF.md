@@ -170,6 +170,12 @@ How writes work, and why:
   second later. Phones use their own clocks.
 - Every event (guess, pass, player taken out) bumps `seq` and is stored in
   `last`; a phone shows the result moment when it sees `seq` change.
+- `signInGuest` waits for Firebase to restore the saved user before deciding
+  nobody is signed in. Without that wait a reload signed the phone in as a new
+  guest, which cost the host their game (the owner hit this on the live site:
+  "I backed out as host and it is asking me to give a name now").
+  `test/backend.test.mjs` covers it. The name screen also offers "Already in
+  this game? Sign in with Google" and "Back to the start".
 - The page takes the game state only from the live listener, never from the
   result of its own write. Keep that: the result can be older than what the
   listener already delivered.
@@ -187,6 +193,7 @@ How writes work, and why:
 `npm install && npm test` (needs Java for the emulator):
 
 - `test/game.test.mjs`: 27 tests of the rules on their own.
+- `test/backend.test.mjs`: 3 tests of sign-in on reload, against a stand-in SDK.
 - `test/phones.mjs`: five simulated phones run the real page and real SDK
   against the Auth and Firestore emulators with the real rules: three rounds
   covering reading, the guess panel, result moments, passing, both safety

@@ -23,6 +23,11 @@ export function makeBackend(sdk, config, options) {
     return sdk.signInWithPopup(a, new sdk.GoogleAuthProvider());
   };
 
+  /* Resolves once the saved sign-in (if any) has been loaded. */
+  var restored = new Promise(function (resolve) {
+    sdk.onAuthStateChanged(auth, function () { resolve(); });
+  });
+
   function game(code) { return sdk.doc(db, "games", code); }
   function user(uid) { return sdk.doc(db, "users", uid); }
 
@@ -45,8 +50,14 @@ export function makeBackend(sdk, config, options) {
     },
     /* No account: an anonymous sign-in the player never sees. */
     signInGuest: function () {
-      if (auth.currentUser) return Promise.resolve(describe(auth.currentUser));
-      return sdk.signInAnonymously(auth).then(function (r) { return describe(r.user); });
+      /* Wait until Firebase has restored whoever was signed in on this phone.
+         Asking too early finds nobody, and a new anonymous sign-in would then
+         replace the saved user: a reload would cost a player their name and a
+         host their game. */
+      return restored.then(function () {
+        if (auth.currentUser) return describe(auth.currentUser);
+        return sdk.signInAnonymously(auth).then(function (r) { return describe(r.user); });
+      });
     },
     signOut: function () { return sdk.signOut(auth); },
 

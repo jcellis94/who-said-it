@@ -169,6 +169,8 @@
         <button id="sillyBtn" type="button">Give me a silly one</button>
       </form>
       <p class="msg" id="nameMsg" role="status"></p>
+      <button id="nameSignIn" class="quiet" type="button" hidden>Already in this game? Sign in with Google</button>
+      <button id="nameHome" class="quiet" type="button">Back to the start</button>
     </div>
 
     <!-- Taken out by the host -->
@@ -740,6 +742,9 @@ window.startWhoSaidIt = function (deps) {
     var pick = function (a) { return a[Math.floor(Math.random() * a.length)]; };
     $("nameInput").value = pick(SILLY_A) + " " + pick(SILLY_B);
   };
+  /* A host or signed-in player who lands here as a guest gets their place back. */
+  $("nameSignIn").onclick = function () { be.signInGoogle().catch(function (e) { $("nameMsg").textContent = explain(e); }); };
+  $("nameHome").onclick = leave;
   $("rejoinBtn").onclick = function () { rejoining = true; render(); };
   $("homeBtn").onclick = leave;
 
@@ -1146,6 +1151,7 @@ window.startWhoSaidIt = function (deps) {
     if (out) { $("removedLine").textContent = name(s.host) + " took you out. If that was a mistake, hop back in."; closeSheets(); return; }
     if (!joined) {
       show("midRound", p !== "lobby" && p !== "over");
+      show("nameSignIn", !me.google);
       if (!$("nameInput").value && me.google && me.name && document.activeElement !== $("nameInput")) {
         $("nameInput").value = me.name.split(" ")[0].slice(0, 20);
       }
