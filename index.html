@@ -59,6 +59,8 @@
   #barLabel { font-weight: 700; flex: 1; }
   #bar button { width: auto; min-height: 44px; padding: 8px 16px; }
 
+  #homeCards { display: flex; flex-direction: column; }
+  #homeCards.signedIn #hostCard { order: -1; }
   .bigcode { font: 700 44px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.14em; text-align: center; margin: 6px 0 10px; }
   canvas.qr { display: block; margin: 0 auto 10px; width: 180px; height: 180px; border-radius: 8px; background: #fff; }
   .topic { font-size: 24px; line-height: 1.25; font-weight: 700; margin: 10px 0 8px; letter-spacing: -0.01em; text-wrap: balance; }
@@ -129,23 +131,27 @@
     <h1>Who Said It</h1>
     <p class="soft lead">Everyone writes a secret answer. Then you guess who wrote what.</p>
 
-    <div class="card">
-      <form id="joinForm" autocomplete="off">
-        <label for="codeInput"><strong>Got a code?</strong></label>
-        <input id="codeInput" type="text" inputmode="text" autocapitalize="characters" maxlength="6" placeholder="Game code" aria-describedby="homeMsg">
-        <button class="main" id="joinBtn" type="submit">Join the game</button>
-      </form>
-      <p class="msg" id="homeMsg" role="status"></p>
-    </div>
+    <p id="whoami" class="lead" hidden></p>
+    <div id="homeCards">
+      <div class="card" id="joinCard">
+        <form id="joinForm" autocomplete="off">
+          <label for="codeInput"><strong id="joinHead">Got a code?</strong></label>
+          <input id="codeInput" type="text" inputmode="text" autocapitalize="characters" maxlength="6" placeholder="Game code" aria-describedby="homeMsg">
+          <button class="main" id="joinBtn" type="submit">Join the game</button>
+        </form>
+        <p class="soft small" id="joinNote">No account needed.</p>
+        <p class="msg" id="homeMsg" role="status"></p>
+      </div>
 
-    <div class="card">
-      <p><strong>Running the game tonight?</strong></p>
-      <p class="soft small">The host signs in with Google. Everyone else just needs the code.</p>
-      <button id="startBtn" type="button" disabled>Getting ready…</button>
+      <!-- Signed out: sign in. Signed in: host a game. -->
+      <div class="card" id="hostCard">
+        <p><strong id="hostHead"></strong></p>
+        <p class="soft small" id="hostLine"></p>
+        <button id="signInBtn" type="button" hidden>Sign in with Google</button>
+        <button id="startBtn" class="main" type="button" hidden>Host a game</button>
+        <p class="soft small" id="homeWait">Getting ready…</p>
+      </div>
     </div>
-
-    <p id="whoami" class="soft small" hidden></p>
-    <button id="signInBtn" class="quiet" type="button" hidden>Sign in to keep count of your wins</button>
     <button id="signOutBtn" class="quiet" type="button" hidden>Sign out</button>
   </section>
 
@@ -635,7 +641,7 @@ window.startWhoSaidIt = function (deps) {
     if (changed && !me) leave();
     render();
   });
-  $("signInBtn").onclick = function () { be.signInGoogle().catch(function (e) { toast(explain(e)); }); };
+  $("signInBtn").onclick = function () { be.signInGoogle().catch(function (e) { $("homeMsg").textContent = explain(e); }); };
   $("signOutBtn").onclick = function () { leave(); be.signOut(); };
 
   /* ---------- joining and starting ---------- */
@@ -690,12 +696,11 @@ window.startWhoSaidIt = function (deps) {
     if (!/^[A-Z2-9]{6}$/.test(c)) { $("homeMsg").textContent = "A game code is six letters and numbers."; return; }
     open(c);
   };
+  /* Hosting needs a Google sign-in; signing in does not start a game. */
   $("startBtn").onclick = function () {
+    if (!me || !me.google) return;
     $("startBtn").disabled = true;
-    var ready = me && me.google ? Promise.resolve() : be.signInGoogle();
-    ready.then(function () { return create(0); }).catch(function (e) {
-      $("homeMsg").textContent = explain(e);
-    }).then(function () { render(); });
+    create(0).catch(function (e) { $("homeMsg").textContent = explain(e); }).then(function () { $("startBtn").disabled = false; render(); });
   };
 
   function link() { return location.origin + location.pathname + "#" + code; }
@@ -1096,14 +1101,20 @@ window.startWhoSaidIt = function (deps) {
     show("hRemove", box.children.length > 0);
   }
 
+  /* Signed out: join with a code, or sign in. Signed in: host or join. */
   function drawHome() {
     var google = !!(me && me.google);
-    $("startBtn").disabled = !userKnown;
-    $("startBtn").textContent = !userKnown ? "Getting ready…" : google ? "Host a game" : "Sign in and host a game";
-    $("startBtn").className = google ? "main" : "";
+    $("homeCards").className = google ? "signedIn" : "";
     show("whoami", google);
-    $("whoami").textContent = google ? "Signed in as " + (me.name || "a Google user") + "." + (stats ? " Won " + stats.w + " of " + stats.g + " games." : "") : "";
+    $("whoami").textContent = google ? "Signed in as " + (me.name || "a Google user") + "." + (stats && stats.g ? " Won " + stats.w + " of " + stats.g + " games." : "") : "";
+    $("hostHead").textContent = google ? "Host a game" : "Sign in";
+    $("hostLine").textContent = google ? "You get a code for everyone else to join with."
+      : "Sign in with Google to host a game, or to keep your name and your wins on any phone.";
+    $("joinHead").textContent = google ? "Join a game" : "Got a code?";
+    show("joinNote", !google);
+    show("homeWait", !userKnown);
     show("signInBtn", userKnown && !google);
+    show("startBtn", userKnown && google);
     show("signOutBtn", google);
   }
 
@@ -1205,7 +1216,7 @@ if (!window.WSI_DEPS) {
     const options = window.WSI_TEST ? window.WSI_TEST(sdk) : {};
     window.startWhoSaidIt({ backend: backend.makeBackend(sdk, config, options), game, topics });
   } catch (e) {
-    document.getElementById("startBtn").textContent = "Couldn't load the game. Check your internet and reload.";
+    document.getElementById("homeWait").textContent = "Couldn't load the game. Check your internet and reload.";
   }
 }
 </script>

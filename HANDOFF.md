@@ -99,6 +99,11 @@ not objected to).
 - The host can take a player out at any time; mid-round their answer stays on
   the list as a decoy. (chose)
 - A late joiner plays from the next round. (chose)
+- Signing in is its own step on the home screen and does not start a game.
+  Signed out, home offers "Join the game" and "Sign in with Google"; signed
+  in, it offers "Host a game" and "Join a game". (said: "You should also be
+  able to sign in without hosting a game. So when signed in it says host or
+  join")
 - A guest who signs in with Google keeps their seat on any phone and gets a
   saved count of games won. (chose)
 - Title "Who Said It"; the host picks a topic pack: General, Thanksgiving,

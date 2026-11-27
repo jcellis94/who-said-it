@@ -105,17 +105,23 @@ const moment = (p, re) => until(() => re.test(mom(p)));
 try {
   // ================= the page, end to end =================
   const A = phone("", "alice");
-  await until(() => !el(A, "startBtn").disabled);
-  check("home shows first; hosting asks for a sign-in, joining does not", vis(A, "home") && text(A, "startBtn") === "Sign in and host a game" && text(A, "joinBtn") === "Join the game", text(A, "startBtn"));
+  await until(() => vis(A, "signInBtn"));
+  check("signed out, home offers joining with a code and signing in; hosting is not offered yet",
+    vis(A, "home") && text(A, "joinBtn") === "Join the game" && text(A, "joinHead") === "Got a code?" && text(A, "signInBtn") === "Sign in with Google" && !vis(A, "startBtn"), text(A, "hostHead"));
 
   el(A, "codeInput").value = "zzzzzz"; submit(A, "joinForm");
   await until(() => /find game/.test(text(A, "homeMsg")));
   check("an unknown code is refused with a message", text(A, "homeMsg") === "Can't find game ZZZZZZ. Check the code with your host.", text(A, "homeMsg"));
 
+  click(A, "signInBtn");
+  await until(() => vis(A, "startBtn"));
+  check("signing in does not start a game; home then says host or join",
+    vis(A, "home") && text(A, "whoami") === "Signed in as Alice Example." && text(A, "hostHead") === "Host a game" && text(A, "joinHead") === "Join a game" && !vis(A, "signInBtn") && vis(A, "signOutBtn") && el(A, "homeCards").className === "signedIn",
+    text(A, "whoami") + " / " + text(A, "hostHead") + " / " + text(A, "joinHead"));
   click(A, "startBtn");
   await until(() => vis(A, "name"));
   const code = text(A, "barLabel").replace("Game ", "");
-  check("host signs in with Google and gets a six-character code", /^[A-Z2-9]{6}$/.test(code) && !A.h.auth.currentUser.isAnonymous && A.w.location.hash === "#" + code, code);
+  check("'Host a game' gives a six-character code", /^[A-Z2-9]{6}$/.test(code) && !A.h.auth.currentUser.isAnonymous && A.w.location.hash === "#" + code, code);
   check("the name is asked before anything else, with no menu yet", vis(A, "name") && !vis(A, "lobby") && !vis(A, "menuBtn"));
   check("a Google user's first name is offered", el(A, "nameInput").value === "Alice", el(A, "nameInput").value);
   await join(A, "Ann");
@@ -132,7 +138,7 @@ try {
   await until(() => vis(C, "signInBtn"));
   click(C, "signInBtn");
   await until(() => /Signed in as Carol/.test(text(C, "whoami")));
-  check("a guest can sign in with Google first; it is optional", !C.h.auth.currentUser.isAnonymous, text(C, "whoami"));
+  check("a signed-in player can join a game instead of hosting one", !C.h.auth.currentUser.isAnonymous && vis(C, "startBtn") && vis(C, "joinForm"), text(C, "whoami"));
   el(C, "codeInput").value = code.toLowerCase(); submit(C, "joinForm");
   await join(C, "bob");
   await until(() => text(C, "nameMsg") !== "");
