@@ -5,8 +5,10 @@
    runs a move inside a Firestore transaction, so two phones cannot both apply
    a move to the same state. test/game.test.mjs tests this file on its own.
 
-   A round goes: write (everyone sends one secret answer), read (the reader
-   shows the answers one at a time and reads them aloud), guess (turns), done.
+   A round goes: write (everyone sends one secret answer), guess (all the
+   answers appear on every phone at once and players take turns), done. A
+   separate read step, where one player revealed the answers one by one, was
+   built and removed on 2026-11-27 because it did not work in play.
    There are no clocks during a round. A guesser may pass; the host may pass
    anyone and may close the writing. If nothing has happened for STALL_MS,
    every player may do what the host could, so a missing host cannot freeze
@@ -17,7 +19,7 @@
      created   server timestamp
      target    first to this many points wins (checked at the end of a round)
      pack      topic pack key (see topics.js)
-     phase     lobby | write | read | guess | done | over
+     phase     lobby | write | guess | done | over
      round     0 in the lobby, then 1, 2, ...
      topic     this round's topic
      used      topic numbers already played from this pack
@@ -27,8 +29,8 @@
      answers   { uid: text }   the page shows the text and hides the uid
      shuffle   uids of answers in the order they are read and shown
      found     { answer uid: uid of the player it was matched to }
-     reader    uid reading the answers aloud; they also guess first
-     shown     how many answers the reader has revealed
+     reader    unused, always ""  } left over from the read step; kept so the
+     shown     unused, always 0   } security rules' field count stays the same
      turn      uid whose turn it is to guess
      misses    wrong guesses made this turn
      allowed   wrong guesses allowed per turn (grows as trips go by)
@@ -52,7 +54,6 @@
 export var RULES = {
   NEXT_MS: 60000,       // pause before the next round starts by itself
   STALL_MS: 120000,     // quiet time before any player may do the host's unsticking
-  READ_MS: 20000,       // quiet time before the next answer shows itself
   TRIPS_PER_STEP: 2,    // trips around the table before everyone gets one more try
   MAX_MISSES: 3,        // most wrong guesses per turn
   BONUS: 2,             // points for the last one hiding
@@ -222,7 +223,7 @@ function endRound(s, now) {
   }
 }
 
-/* Writing is over: hand the answers to the reader. */
+/* Writing is over: show the answers and start the guessing. */
 function reveal(s, now, rand) {
   var answered = s.inRound.filter(function (id) { return s.answers[id] !== undefined; });
   Object.keys(s.answers).forEach(function (id) { if (answered.indexOf(id) < 0) delete s.answers[id]; });
@@ -232,12 +233,12 @@ function reveal(s, now, rand) {
     s.note = "few";
     return;
   }
-  s.phase = "read";
+  /* Straight to guessing: every phone shows all the answers at once. */
+  s.phase = "guess";
   s.alive = answered;
   s.shuffle = shuffled(answered, rand || Math.random);
-  s.reader = answered[(s.round - 1) % answered.length];
-  s.shown = 1;
-  s.turn = ""; s.misses = 0; s.allowed = 1; s.trips = 0; s.tripLeft = answered.length;
+  s.turn = answered[(s.round - 1) % answered.length];
+  s.misses = 0; s.allowed = 1; s.trips = 0; s.tripLeft = answered.length;
   s.since = now;
 }
 
@@ -258,7 +259,7 @@ export function submit(s, uid, args, now, rand) {
 /* Phones send answers one field at a time without a transaction (see
    backend.js put), so the last one in asks for this. */
 export function allIn(s, uid, args, now, rand) {
-  if (s.phase !== "write") fail("The answers are already being read.");
+  if (s.phase !== "write") fail("Guessing has already started.");
   if (!s.players[uid]) fail("You are not in this game.");
   if (!s.inRound.length || !s.inRound.every(function (id) { return s.answers[id] !== undefined; })) fail("Still waiting for answers.");
   s = clone(s);
@@ -268,50 +269,10 @@ export function allIn(s, uid, args, now, rand) {
 
 /* Start without the players who have not answered. */
 export function closeWriting(s, uid, args, now, rand) {
-  if (s.phase !== "write") fail("The answers are already being read.");
+  if (s.phase !== "write") fail("Guessing has already started.");
   hostOrStalled(s, uid, now, "start without the others");
   s = clone(s);
   reveal(s, now, rand);
-  return s;
-}
-
-/* ---------- reading ---------- */
-
-/* The reader, or any player's phone when the reader has gone quiet. The
-   phone names the answer count it saw, so two phones cannot both advance. */
-function mayRead(s, uid, args, now) {
-  if (s.phase !== "read") fail("Nobody is reading right now.");
-  if (uid === s.reader) return;
-  if (args && args.auto && s.players[uid] && args.shown === s.shown && now - s.since >= RULES.READ_MS) return;
-  fail("Only the reader can do that.");
-}
-
-export function nextAnswer(s, uid, args, now) {
-  mayRead(s, uid, args, now);
-  if (s.shown >= s.shuffle.length) fail("That's all of them.");
-  s = clone(s);
-  s.shown += 1; s.since = now;
-  return s;
-}
-
-export function passReader(s, uid, args, now) {
-  if (s.phase !== "read") fail("Nobody is reading right now.");
-  if (uid !== s.reader && uid !== s.host) fail("Only the reader can do that.");
-  s = clone(s);
-  s.reader = s.alive[(s.alive.indexOf(s.reader) + 1) % s.alive.length];
-  s.since = now;
-  return s;
-}
-
-/* Once every answer has been shown, the reader guesses first. */
-export function beginGuess(s, uid, args, now) {
-  mayRead(s, uid, args, now);
-  if (s.shown < s.shuffle.length) fail("Read the rest of the answers first.");
-  s = clone(s);
-  s.phase = "guess";
-  s.turn = s.reader;
-  s.reader = "";
-  s.misses = 0; s.since = now;
   return s;
 }
 
@@ -389,10 +350,9 @@ export function remove(s, uid, args, now, rand) {
   if (s.phase === "write") {
     delete s.answers[id];
     if (s.inRound.length && s.inRound.every(function (x) { return s.answers[x] !== undefined; })) reveal(s, now, rand);
-  } else if ((s.phase === "read" || s.phase === "guess") && s.alive.indexOf(id) >= 0) {
+  } else if (s.phase === "guess" && s.alive.indexOf(id) >= 0) {
     /* Their answer stays on the list as a decoy nobody can match. */
     happened(s, { kind: "left", by: "", answer: name, target: "", ok: false });
-    if (s.reader === id) s.reader = s.alive[(s.alive.indexOf(id) + 1) % s.alive.length];
     if (s.turn === id) passTurn(s, now);
     knockOut(s, id, now);
   }

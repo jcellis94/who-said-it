@@ -70,7 +70,7 @@
   #turnHead { font-size: 26px; font-weight: 800; line-height: 1.15; margin: 0; }
   .banner { border-left: 4px solid var(--brand); background: var(--card); padding: 10px 14px; border-radius: 0 12px 12px 0; }
 
-  #answerList button, #revealList li, #readList li, #logList li {
+  #answerList button, #revealList li, #logList li {
     text-align: left; font-weight: 500; padding: 14px; border-radius: 12px;
     border: 1px solid var(--line); background: var(--card); width: 100%;
   }
@@ -78,8 +78,6 @@
   #answerList button.found .text { text-decoration: line-through; }
   .tag { display: block; font-size: 14px; color: var(--soft); margin-top: 2px; }
   #logList li { padding: 10px 14px; font-size: 15px; }
-  #readBig { font-size: 28px; line-height: 1.25; font-weight: 700; padding: 28px 18px; text-align: center; text-wrap: balance; }
-  #readList li.now { border-color: var(--brand); background: var(--pick); }
 
   .people li, #lobbyList li {
     display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px;
@@ -239,28 +237,6 @@
       <p id="sitOut" class="banner" hidden>You joined mid-round. Watch this one. You're in the next one.</p>
       <p id="waiting" class="soft"></p>
       <button id="unstickW" type="button" hidden></button>
-    </div>
-
-    <!-- Read -->
-    <div id="read" hidden>
-      <div id="readMine" hidden>
-        <h1>You're the reader</h1>
-        <p class="lead">Read each answer out loud. Then you guess first.</p>
-        <p class="soft small" id="topicR1"></p>
-        <div class="card" id="readBig"></div>
-        <p class="soft" style="text-align:center" id="readCount1"></p>
-        <div class="stack">
-          <button class="main" id="readNextBtn" type="button">Next answer</button>
-          <button class="quiet" id="readPassBtn" type="button">Let someone else read</button>
-        </div>
-      </div>
-      <div id="readOthers" hidden>
-        <h1>Listen up</h1>
-        <p class="lead" id="readWho"></p>
-        <p class="soft small" id="topicR2"></p>
-        <ul id="readList"></ul>
-        <p class="soft" style="text-align:center" id="readCount2"></p>
-      </div>
     </div>
 
     <!-- Guess -->
@@ -469,7 +445,7 @@ window.startWhoSaidIt = function (deps) {
   var LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   var HOWTO = [
     "Everyone gets the same topic and writes one secret answer.",
-    "The answers are read out. Nobody knows who wrote what.",
+    "All the answers appear on every phone. Nobody knows who wrote what.",
     "On your turn, guess who wrote one. Right? You score and go again.",
     "Get caught and you're out of the guessing for that round. Last one hiding scores 2 extra."
   ];
@@ -602,7 +578,12 @@ window.startWhoSaidIt = function (deps) {
     if (now.phase === "guess" && now.allowed > old.allowed && old.phase === "guess") {
       more.push(now.allowed === 2 ? "Second chances! Everyone gets 2 tries a turn now." : "Third chances! Everyone gets 3 tries a turn now.");
     }
-    if (now.seq !== old.seq && now.last) {
+    if (old.phase === "write" && now.phase === "guess" && now.round === old.round) {
+      /* writing has closed: flash, then every answer is on the screen */
+      var everyone = now.inRound.every(function (id) { return now.answers[id] !== undefined; });
+      moment("", "Time to guess!", everyone ? "Everyone's in." : "",
+        now.turn === uid ? "You go first. Read the answers out loud, then pick one." : name(now.turn) + " goes first.");
+    } else if (now.seq !== old.seq && now.last) {
       var L = now.last, ended = now.phase === "done" || now.phase === "over";
       var up = !ended && now.turn && now.turn !== old.turn ? (now.turn === uid ? "You're up." : name(now.turn) + " is up.") : "";
       if (L.kind === "guess") {
@@ -629,7 +610,6 @@ window.startWhoSaidIt = function (deps) {
     } else if (more.length) moment("", more[0], "", "");
     /* the phone it concerns gets a buzz */
     if (now.phase === "guess" && now.turn === uid && (old.turn !== uid || old.phase !== "guess")) buzz();
-    if (now.phase === "read" && now.reader === uid && (old.reader !== uid || old.phase !== "read")) buzz();
     if (now.phase === "write" && old.phase === "write" && now.round === old.round && now.topic !== old.topic) {
       $("newTopic").textContent = "New topic! " + name(now.host) + " swapped it." + (old.answers[uid] !== undefined ? " Write a new answer." : "");
       show("newTopic", true); editing = false; peeking = false;
@@ -779,7 +759,7 @@ window.startWhoSaidIt = function (deps) {
     ev.preventDefault();
     putMine("submit", { text: $("answerInput").value }, "answers").then(function () {
       editing = false; peeking = false; $("answerInput").value = ""; show("newTopic", false); render();
-      quietly(act("allIn", null, true));   // hands the answers to the reader if this was the last one
+      quietly(act("allIn", null, true));   // starts the guessing if this was the last answer
     }, function (e) {
       toast(e && e.code === "permission-denied" ? "Answers are closed for this round." : explain(e));
     });
@@ -795,12 +775,6 @@ window.startWhoSaidIt = function (deps) {
     });
   }
   $("unstickW").onclick = startWithout;
-
-  /* ---------- reading ---------- */
-  $("readNextBtn").onclick = function () {
-    quietly(act(s.shown >= s.shuffle.length ? "beginGuess" : "nextAnswer"));
-  };
-  $("readPassBtn").onclick = function () { quietly(act("passReader")); };
 
   /* ---------- guessing ---------- */
   function closePick() { picked = ""; target = ""; show("pickVeil", false); }
@@ -874,10 +848,6 @@ window.startWhoSaidIt = function (deps) {
       once("next" + s.round + ":" + s.deadline, 4000, function () {
         return act("startRound", Object.assign({ clock: true, deadline: s.deadline }, isHost() && nextPick ? nextPick : freshTopic()), true);
       });
-    } else if (s.phase === "read" && me.uid !== s.reader && Date.now() - s.since >= G.RULES.READ_MS + lag) {
-      once("read" + s.round + ":" + s.shown + ":" + s.since, 4000, function () {
-        return act(s.shown >= s.shuffle.length ? "beginGuess" : "nextAnswer", { auto: true, shown: s.shown }, true);
-      });
     }
     /* the safety-net buttons appear without anything else changing */
     if ((s.phase === "write" || s.phase === "guess") && stalled() !== tick.wasStalled) { tick.wasStalled = stalled(); render(); }
@@ -942,22 +912,6 @@ window.startWhoSaidIt = function (deps) {
     if (stuck) $("unstickW").textContent = "Start without " + list(all.map(name));
   }
 
-  function drawRead() {
-    var mine = s.reader === me.uid, n = s.shuffle.length, count = s.shown + " of " + n;
-    show("readMine", mine); show("readOthers", !mine);
-    $("topicR1").textContent = s.topic; $("topicR2").textContent = s.topic;
-    $("readBig").textContent = quote(s.answers[s.shuffle[s.shown - 1]] || "");
-    $("readCount1").textContent = s.shown >= n ? "That's all of them." : count;
-    $("readCount2").textContent = s.shown >= n ? name(s.reader) + " guesses first." : count;
-    $("readNextBtn").textContent = s.shown >= n ? "Start the guessing" : "Next answer";
-    $("readNextBtn").disabled = sending;
-    $("readWho").textContent = name(s.reader) + " is reading the answers.";
-    var box = $("readList"); box.textContent = "";
-    s.shuffle.slice(0, s.shown).forEach(function (a, i) {
-      box.appendChild(make("li", i === s.shown - 1 ? "now" : "", (i + 1) + ". " + s.answers[a]));
-    });
-  }
-
   function drawGuess() {
     var uid = me.uid, myTurn = s.turn === uid, playing = s.inRound.indexOf(uid) >= 0 && s.answers[uid] !== undefined;
     var caught = playing && s.alive.indexOf(uid) < 0, up = nextUp();
@@ -991,7 +945,6 @@ window.startWhoSaidIt = function (deps) {
         if (a === uid) b.appendChild(make("span", "tag", "yours"));
         b.onclick = function () {
           if (s.turn !== uid) { toast("Hang on, it's " + name(s.turn) + "'s turn."); return; }
-          if (sending) return;
           picked = a; target = ""; render();
         };
       }
@@ -1143,7 +1096,6 @@ window.startWhoSaidIt = function (deps) {
     show("name", !joined && !out); show("removed", out);
     show("lobby", joined && p === "lobby");
     show("write", joined && p === "write");
-    show("read", joined && p === "read");
     show("guess", joined && p === "guess");
     show("over", joined && p === "over");
     show("done", joined && (p === "done" || p === "over"));
@@ -1159,7 +1111,6 @@ window.startWhoSaidIt = function (deps) {
     }
     if (p === "lobby") drawLobby();
     if (p === "write") drawWrite();
-    if (p === "read") drawRead();
     if (p === "guess") drawGuess();
     if (p === "done" || p === "over") drawDone();
     if (p === "over") drawOver();
@@ -1192,7 +1143,7 @@ if (!window.WSI_DEPS) {
   const cdn = "https://www.gstatic.com/firebasejs/13.4.0/";
   /* Change this whenever game.js, backend.js or topics.js changes, so a phone
      never runs a new page with an old copy of them. */
-  const version = "?v=4";
+  const version = "?v=5";
   try {
     const [app, auth, store, backend, game, topics] = await Promise.all([
       import(cdn + "firebase-app.js"),

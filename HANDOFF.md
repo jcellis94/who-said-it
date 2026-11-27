@@ -6,7 +6,7 @@ this whole file before acting.
 
 ## State on 2026-11-27
 
-**Version 2 ("Read it out") is live** at https://who-said-it-8eeaa.web.app,
+**Version 2 is live** at https://who-said-it-8eeaa.web.app,
 deployed from branch `claude/bold-allen-05u2q8` (rules, then hosting) with the
 owner's go-ahead. Checked on the live site as a guest: the page loads with no
 errors and an unknown code reads "Can't find game". No real game has been
@@ -51,13 +51,22 @@ not objected to).
 - Each player gives a name before anything else: "What's your name tonight?",
   real or silly, with a "Give me a silly one" button. Everyone at the table
   knows who is who. (chose; replaces "Pick your character")
-- A round has four steps: **write, read, guess, scores**.
+- A round has three steps: **write, guess, scores**.
 - Write: every player sends one answer from their own phone. (said) No clock.
   (said: "I'm rethinking any timers now, pass is now doable by host or person
   guessing")
-- Read: a reader shows the answers one at a time on every phone and reads
-  them aloud, then guesses first. The reader rotates each round and can hand
-  the job on with "Let someone else read". (chose, after the house-rule test)
+- When the last answer is in, every phone flashes "Time to guess!" and who
+  goes first, then shows all the answers at once. (said) The first guesser
+  rotates each round and is asked to read the answers out loud. (mine)
+- A read step was built and removed the same day. In it a rotating reader
+  revealed the answers one at a time on every phone. The owner's verdict after
+  playing: "remove the reading step, it doesn't work, when everyone's in it
+  should just flag the screen flash saying it's time to start guessing and
+  show all options as if the reading step had already happened". Reading
+  aloud itself still got laughs in their earlier test; it was the in-app step
+  that failed. Do not rebuild it without asking. The state fields `reader`
+  and `shown` are left over, always empty, so the security rules' field count
+  did not have to change.
 - Guess: players take turns. Tap an answer, tap a name, then "That's my
   guess" under the words "Say it out loud!". Right: one point and another
   guess. Wrong: the turn moves to the next player in join order. A caught
@@ -70,8 +79,7 @@ not objected to).
   start the reading without players who have not answered. (said)
 - Quiet safety net: if nothing has happened for 2 minutes, every player gets
   the button the host has (skip the turn, or start without the missing
-  players), so a missing host cannot freeze the game. If the reader does
-  nothing for 20 seconds the next answer shows itself. (chose)
+  players), so a missing host cannot freeze the game. (chose)
 - After two full trips of the turn around the table, everyone gets 2 tries
   per turn; after two more, 3; never more ("second chances"). The owner's
   idea, and they expect to tune it. (said / chose)
@@ -163,10 +171,9 @@ How writes work, and why:
   seconds before this change). After sending an answer the phone asks for
   `allIn`, which hands the answers to the reader if nobody is missing. The
   rules refuse answer changes outside the write step.
-- Things phones do by themselves (start the next round after the pause, show
-  the next answer when the reader is quiet) name what they saw (the deadline,
-  the answer count); `game.js` refuses the move if that has changed, so two
-  phones cannot both act. The host's phone goes first, the others about a
+- A phone that starts the next round for the clock names the deadline it saw;
+  `game.js` refuses the move if that has changed, so two phones cannot both
+  start a round. The host's phone goes first, the others about a
   second later. Phones use their own clocks.
 - Every event (guess, pass, player taken out) bumps `seq` and is stored in
   `last`; a phone shows the result moment when it sees `seq` change.
@@ -192,14 +199,15 @@ How writes work, and why:
 
 `npm install && npm test` (needs Java for the emulator):
 
-- `test/game.test.mjs`: 27 tests of the rules on their own.
+- `test/game.test.mjs`: 23 tests of the rules on their own.
 - `test/backend.test.mjs`: 3 tests of sign-in on reload, against a stand-in SDK.
 - `test/phones.mjs`: five simulated phones run the real page and real SDK
   against the Auth and Firestore emulators with the real rules: three rounds
-  covering reading, the guess panel, result moments, passing, both safety
+  covering the time-to-guess flash, the guess panel, a bluff with your own
+  answer, result moments, passing, both safety
   nets, a changed topic, taking a player out, winning, saved wins and play
-  again; then about 70 direct attacks on the rules. 161 checks, ending
-  `all passed`; it ran clean six times in a row.
+  again; then about 70 direct attacks on the rules. 156 checks, ending
+  `all passed`.
 
 Also done once by hand for version 2: a round played in real phone-sized
 Chromium (real module loading, light and dark) against the emulators, with no

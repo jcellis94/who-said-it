@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import * as G from "../game.js";
 
 const noShuffle = () => 0.999999;
-const STALL = G.RULES.STALL_MS, READ = G.RULES.READ_MS;
+const STALL = G.RULES.STALL_MS;
 function table(names, options) {
   let s = G.newGame("h", options);
   names.forEach((n, i) => { s = G.join(s, i === 0 ? "h" : n.toLowerCase(), { name: n }, 100 + i); });
@@ -13,16 +13,11 @@ function table(names, options) {
 function writing(names, options) {
   return G.startRound(table(names, options), "h", { topic: "Things a dog thinks about", index: 4 }, 1000);
 }
-function reading(names, options) {
+function guessing(names, options) {
   let s = writing(names, options);
   G.seats(s).forEach(id => { s = G.submit(s, id, { text: "answer of " + id }, 2000, noShuffle); });
   return s;
 }
-function readAll(s) {
-  while (s.shown < s.shuffle.length) s = G.nextAnswer(s, s.reader, null, 2500);
-  return G.beginGuess(s, s.reader, null, 3000);
-}
-const guessing = (names, options) => readAll(reading(names, options));
 const says = (fn, re) => assert.throws(fn, e => e instanceof G.GameError && re.test(e.message));
 
 test("joining: a name is required, unique, and seats follow join order", () => {
@@ -60,7 +55,7 @@ test("starting: host only, two players, no clock on the round", () => {
   assert.deepEqual(s.base, { h: 0, bob: 0, cy: 0 });
 });
 
-test("writing: when everyone has answered, the answers go to the reader", () => {
+test("writing: when everyone has answered, guessing starts with every answer on show", () => {
   let s = writing(["Ann", "Bob", "Cy"]);
   s = G.submit(s, "h", { text: "  one   two " }, 2000);
   assert.equal(s.answers.h, "one two");
@@ -69,10 +64,10 @@ test("writing: when everyone has answered, the answers go to the reader", () => 
   s = G.submit(s, "bob", { text: "b2" }, 2000);
   assert.equal(s.answers.bob, "b2", "an answer can be changed while writing");
   s = G.submit(s, "cy", { text: "c" }, 3000, noShuffle);
-  assert.equal(s.phase, "read");
+  assert.equal(s.phase, "guess");
   assert.deepEqual(s.alive, ["h", "bob", "cy"]);
   assert.deepEqual(s.shuffle.slice().sort(), ["bob", "cy", "h"]);
-  assert.equal(s.reader, "h"); assert.equal(s.shown, 1); assert.equal(s.turn, "");
+  assert.equal(s.turn, "h"); assert.equal(s.reader, ""); assert.equal(s.shown, 0); assert.equal(s.deadline, 0);
   says(() => G.submit(s, "h", { text: "late" }, 1), /closed/);
 });
 
@@ -83,9 +78,9 @@ test("writing: answers sent field by field are closed by allIn once nobody is mi
   s.answers.cy = "c"; s.answers.stray = "not in this round";
   says(() => G.allIn(s, "stranger", null, 5), /not in this game/);
   s = G.allIn(s, "bob", null, 5, noShuffle);
-  assert.equal(s.phase, "read"); assert.deepEqual(s.alive, ["h", "bob", "cy"]);
+  assert.equal(s.phase, "guess"); assert.deepEqual(s.alive, ["h", "bob", "cy"]);
   assert.equal(s.answers.stray, undefined);
-  says(() => G.allIn(s, "bob", null, 6), /already being read/);
+  says(() => G.allIn(s, "bob", null, 6), /already started/);
 });
 
 test("writing: a late joiner plays from the next round", () => {
@@ -93,7 +88,7 @@ test("writing: a late joiner plays from the next round", () => {
   s = G.join(s, "dee", { name: "Dee" }, 1500);
   says(() => G.submit(s, "dee", { text: "x" }, 1600), /next round/);
   s = G.submit(G.submit(s, "h", { text: "a" }, 1), "bob", { text: "b" }, 1);
-  assert.equal(s.phase, "read", "the late joiner does not hold up the round");
+  assert.equal(s.phase, "guess", "the late joiner does not hold up the round");
 });
 
 test("writing: the host starts without stragglers; anyone may after two quiet minutes", () => {
@@ -104,7 +99,7 @@ test("writing: the host starts without stragglers; anyone may after two quiet mi
   says(() => G.closeWriting(s, "stranger", null, 6000 + STALL), /Only the host/);
   const byPlayer = G.closeWriting(s, "bob", null, 6000 + STALL, noShuffle);
   assert.deepEqual(byPlayer.alive, ["h", "bob"], "the player who never answered watches");
-  assert.equal(G.closeWriting(s, "h", null, 6001, noShuffle).phase, "read");
+  assert.equal(G.closeWriting(s, "h", null, 6001, noShuffle).phase, "guess");
 });
 
 test("writing: fewer than two answers voids the round", () => {
@@ -115,46 +110,12 @@ test("writing: fewer than two answers voids the round", () => {
   assert.equal(s.deadline, 5000 + G.RULES.NEXT_MS);
 });
 
-test("reading: the reader shows one answer at a time, then guesses first", () => {
-  let s = reading(["Ann", "Bob", "Cy"]);
-  says(() => G.nextAnswer(s, "bob", null, 2100), /Only the reader/);
-  says(() => G.beginGuess(s, "h", null, 2100), /rest of the answers/);
-  says(() => G.guess(s, "h", { answer: "bob", target: "bob" }, 2100), /Nobody is guessing/);
-  s = G.nextAnswer(s, "h", null, 2100);
-  s = G.nextAnswer(s, "h", null, 2200);
-  assert.equal(s.shown, 3);
-  says(() => G.nextAnswer(s, "h", null, 2300), /all of them/);
-  s = G.beginGuess(s, "h", null, 2400);
-  assert.equal(s.phase, "guess"); assert.equal(s.turn, "h"); assert.equal(s.reader, ""); assert.equal(s.deadline, 0);
-});
-
-test("reading: the reader can hand the reading on, and the new reader guesses first", () => {
-  let s = reading(["Ann", "Bob", "Cy"]);
-  says(() => G.passReader(s, "cy", null, 1), /Only the reader/);
-  s = G.passReader(s, "h", null, 2100);
-  assert.equal(s.reader, "bob"); assert.equal(s.shown, 1);
-  assert.equal(readAll(s).turn, "bob");
-});
-
-test("reading: if the reader goes quiet, any phone shows the next answer, once", () => {
-  let s = reading(["Ann", "Bob", "Cy"]);
-  const seen = { auto: true, shown: 1 };
-  says(() => G.nextAnswer(s, "cy", seen, s.since + READ - 1), /Only the reader/);
-  says(() => G.nextAnswer(s, "stranger", seen, s.since + READ), /Only the reader/);
-  const t = G.nextAnswer(s, "cy", seen, s.since + READ);
-  assert.equal(t.shown, 2);
-  says(() => G.nextAnswer(t, "bob", seen, t.since + READ), /Only the reader/, "a second phone acting on the same answer does nothing");
-  let u = G.nextAnswer(t, "bob", { auto: true, shown: 2 }, t.since + READ);
-  u = G.beginGuess(u, "cy", { auto: true, shown: 3 }, u.since + READ);
-  assert.equal(u.phase, "guess"); assert.equal(u.turn, "h");
-});
-
-test("first reader rotates each round", () => {
+test("first guesser rotates each round", () => {
   let s = guessing(["Ann", "Bob", "Cy"]);
   s = G.guess(G.guess(s, "h", { answer: "bob", target: "bob" }, 1), "h", { answer: "cy", target: "cy" }, 1);
   s = G.startRound(s, "h", { topic: "T2" }, 1);
   G.seats(s).forEach(id => { s = G.submit(s, id, { text: "x" + id }, 2, noShuffle); });
-  assert.equal(s.reader, "bob");
+  assert.equal(s.turn, "bob");
 });
 
 test("guessing: right scores a point, catches the writer and keeps the turn", () => {
@@ -223,7 +184,7 @@ test("identical answers count for either writer", () => {
   let s = writing(["Ann", "Bob", "Cy"]);
   s = G.submit(s, "h", { text: "a" }, 1);
   s = G.submit(s, "bob", { text: "The Dog" }, 1);
-  s = readAll(G.submit(s, "cy", { text: "the dog" }, 1, noShuffle));
+  s = G.submit(s, "cy", { text: "the dog" }, 1, noShuffle);
   s = G.guess(s, "h", { answer: "bob", target: "cy" }, 1);
   assert.equal(s.last.ok, true);
   assert.deepEqual(s.alive, ["h", "bob"]);
@@ -274,20 +235,11 @@ test("taking someone out: host only, never the host; scores and seat go", () => 
   assert.deepEqual(G.seats(G.remove(s, "h", { player: "bob" }, 1)), ["h", "cy"]);
 });
 
-test("taking someone out while writing: reading starts if everyone left has answered", () => {
+test("taking someone out while writing: guessing starts if everyone left has answered", () => {
   let s = writing(["Ann", "Bob", "Cy"]);
   s = G.submit(G.submit(s, "h", { text: "a" }, 1), "bob", { text: "b" }, 1);
   s = G.remove(s, "h", { player: "cy" }, 1, noShuffle);
-  assert.equal(s.phase, "read"); assert.deepEqual(s.alive, ["h", "bob"]);
-});
-
-test("taking the reader out hands the reading to the next player", () => {
-  let s = reading(["Ann", "Bob", "Cy", "Dee"]);
-  s = G.passReader(s, "h", null, 1);
-  s = G.remove(s, "h", { player: "bob" }, 2);
-  assert.equal(s.reader, "cy"); assert.equal(s.phase, "read");
-  assert.deepEqual(s.last, { kind: "left", by: "", answer: "Bob", target: "", ok: false });
-  assert.equal(readAll(s).turn, "cy");
+  assert.equal(s.phase, "guess"); assert.deepEqual(s.alive, ["h", "bob"]);
 });
 
 test("taking someone out while guessing: their turn moves on, their answer stays as a decoy, a lone survivor ends the round", () => {

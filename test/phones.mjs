@@ -166,32 +166,21 @@ try {
     [A, C, D].every(p => !/the dog/.test(p.d.body.textContent)));
   await answer(C, "gravy"); await answer(D, "a sock");
   await wait(300);
-  check("reading does not start while one answer is missing", [A, B, C, D].every(p => vis(p, "write")));
+  check("guessing does not start while one answer is missing", [A, B, C, D].every(p => vis(p, "write")));
   await answer(A, "naps");
-  await all([A, B, C, D], p => vis(p, "read"));
-
-  // ----- reading -----
-  check("round 1's reader is the first player; everyone else is told to listen",
-    vis(A, "readMine") && !vis(A, "readOthers") && [B, C, D].every(p => vis(p, "readOthers") && !vis(p, "readMine") && text(p, "readWho") === "Ann is reading the answers."));
-  check("the reader sees one answer, large; the others see the same one", text(A, "readCount1") === "1 of 4" && texts(B, "#readList li").length === 1 &&
-    "“" + texts(B, "#readList li")[0].replace(/^1\. /, "") + "”" === text(A, "readBig"), text(A, "readBig") + " / " + texts(B, "#readList li"));
-  let refusal = "";
-  await B.h.be.act(code, st => game.nextAnswer(st, uid(B), null, Date.now())).catch(e => { refusal = e.message; });
-  check("only the reader moves the reading on", /Only the reader/.test(refusal), refusal);
-  for (let i = 2; i <= 4; i++) { await until(() => !el(A, "readNextBtn").disabled); click(A, "readNextBtn"); await all([A, B, C, D], p => p === A ? text(A, "readCount1") !== (i - 1) + " of 4" : texts(p, "#readList li").length === i); }
-  const order = texts(C, "#readList li").map(x => x.replace(/^\d\. /, ""));
-  check("every answer is read out once, in the same shuffled order on every phone",
-    order.slice().sort().join("|") === "<i>the dog</i>|a sock|gravy|naps" && texts(D, "#readList li").join() === texts(C, "#readList li").join(), order.join("|"));
-  check("an answer with markup is shown as text", C.d.querySelectorAll("#readList i").length === 0);
-  check("after the last answer the reader's button starts the guessing", text(A, "readNextBtn") === "Start the guessing" && text(A, "readCount1") === "That's all of them." && text(B, "readCount2") === "Ann guesses first.", text(A, "readNextBtn"));
-  click(A, "readNextBtn");
   await all([A, B, C, D], p => vis(p, "guess") && answers(p).length === 4);
+  check("when the last answer is in, every phone flashes that it is time to guess and who goes first",
+    await moment(A, /Time to guess!Everyone's in\.You go first\. Read the answers out loud, then pick one\./) && await moment(B, /Time to guess!Everyone's in\.Ann goes first\./), mom(A) + " | " + mom(B));
+  const order = answers(C).map(own);
+  check("every answer is on show at once, in the same shuffled order on every phone",
+    order.slice().sort().join("|") === "<i>the dog</i>|a sock|gravy|naps" && [A, B, D].every(p => answers(p).map(own).join("|") === order.join("|")), order.join("|"));
+  check("an answer with markup is shown as text", C.d.querySelectorAll("#answerList i").length === 0);
+  let refusal = "";
 
   // ----- guessing -----
-  check("the reader guesses first; the others see who is guessing and who is next",
+  check("round 1 starts with the first player; the others see who is guessing and who is next",
     text(A, "turnHead") === "Your turn, Ann" && el(A, "turnBox").className === "mine" && text(B, "turnHead") === "Ann is guessing" && text(B, "turnLine") === "You're up next." && text(C, "turnLine") === "Up next: Bob",
     text(A, "turnHead") + " / " + text(B, "turnLine") + " / " + text(C, "turnLine"));
-  check("answers are in the order they were read", answers(B).map(own).join("|") === order.join("|"));
   check("no phone shows who wrote an unguessed answer",
     [A, B, C, D].every(p => p.d.querySelectorAll("#answerList .tag").length === 1 && p.d.querySelector("#answerList .tag").textContent === "yours"));
   answers(B)[0].click();
@@ -274,38 +263,33 @@ try {
   await until(() => vis(A, "askVeil"));
   check("it asks first and says what happens", text(A, "askText") === "Start without Cy and Dee <b>x</b>? They'll watch this round.", text(A, "askText"));
   await yes(A);
-  await all([A, B, C, D, E], p => vis(p, "read"));
-  check("round 2's reader is the second player", vis(B, "readMine") && text(A, "readWho") === "Bob is reading the answers.");
-  click(B, "readPassBtn");
-  await all([A, B, C], p => p === A ? vis(A, "readMine") : text(p, "readWho") === "Ann is reading the answers.");
-  check("'Let someone else read' hands the reading to the next player", vis(A, "readMine") && vis(B, "readOthers"));
-  game.RULES.READ_MS = 300;
-  await all([A, B, C, D, E], p => vis(p, "guess"), 9000);
-  game.RULES.READ_MS = 20000;
-  check("if the reader goes quiet the answers show themselves, and the reader still guesses first",
-    text(A, "turnHead") === "Your turn, Ann" && answers(D).length === 2 && text(C, "stateBanner") === "You're watching this round.", text(A, "turnHead") + " " + text(C, "stateBanner"));
+  await all([A, B, C, D, E], p => vis(p, "guess"));
+  check("the flash says who goes first, and does not claim everyone is in", await moment(C, /Time to guess!Bob goes first\./) && !/Everyone/.test(mom(C)), mom(C));
+  check("the first guesser rotates: round 2 starts with the second player; players who did not answer watch",
+    text(B, "turnHead") === "Your turn, Bob" && answers(D).length === 2 && text(C, "stateBanner") === "You're watching this round.", text(B, "turnHead") + " " + text(C, "stateBanner"));
 
-  click(A, "passBtn");
-  await until(() => vis(A, "askVeil"));
-  check("passing your own turn asks first", text(A, "askText") === "Pass your turn?" && text(A, "askYes") === "Pass");
-  await yes(A);
-  await Promise.all([moment(A, /You passed\./), moment(C, /Ann passed\./)]);
-  await all([A, B, C], p => p === B ? text(B, "turnHead") === "Your turn, Bob" : text(p, "turnHead") === "Bob is guessing");
-  check("a pass moves the turn on and scores nothing", /Bob is up\./.test(mom(C)) && /^Cy=4, Ann=1/.test(scores(C)), mom(C));
+  await until(() => !vis(B, "moment") || true);
+  click(B, "passBtn");
+  await until(() => vis(B, "askVeil"));
+  check("passing your own turn asks first", text(B, "askText") === "Pass your turn?" && text(B, "askYes") === "Pass");
+  await yes(B);
+  await Promise.all([moment(B, /You passed\./), moment(C, /Bob passed\./)]);
+  await all([A, B, C], p => p === A ? text(A, "turnHead") === "Your turn, Ann" : text(p, "turnHead") === "Ann is guessing");
+  check("a pass moves the turn on and scores nothing", /Ann is up\./.test(mom(C)) && /^Cy=4, Ann=1/.test(scores(C)), mom(C));
   check("other players cannot skip someone yet", !vis(C, "unstickG") && !vis(E, "unstickG"));
   game.RULES.STALL_MS = 200;
   await until(() => vis(C, "unstickG"));
-  check("after two quiet minutes every other player gets a skip button", vis(C, "unstickG") && text(C, "unstickG") === "Skip Bob's turn" && !vis(B, "unstickG"), text(C, "unstickG"));
+  check("after two quiet minutes every other player gets a skip button", vis(C, "unstickG") && text(C, "unstickG") === "Skip Ann's turn" && !vis(A, "unstickG"), text(C, "unstickG"));
   click(C, "unstickG");
   await moment(B, /Cy moved things along\./);
   game.RULES.STALL_MS = 120000;
-  await all([A, C], p => p === A ? text(A, "turnHead") === "Your turn, Ann" : text(p, "turnHead") === "Ann is guessing");
+  await all([B, C], p => p === B ? text(B, "turnHead") === "Your turn, Bob" : text(p, "turnHead") === "Bob is guessing");
   check("the skip is credited to whoever pressed it, not blamed on a clock", /Cy moved things along\./.test(mom(B)) && !/time/i.test(mom(B)), mom(B));
 
   game.RULES.NEXT_MS = 1500;
-  await guess(A, "bob two", "Bob");
+  await guess(B, "ann two", "Ann");
   check("round 2 ends", await all([A, B, C, D, E], p => vis(p, "done")));
-  check("scores carry on across rounds", scores(E) === "Cy=4, Ann=4, Bob=0, Dee <b>x</b>=0, Eve=0" || scores(E) === "Ann=4, Cy=4, Bob=0, Dee <b>x</b>=0, Eve=0", scores(E));
+  check("scores carry on across rounds", scores(E) === "Cy=4, Bob=3, Ann=1, Dee <b>x</b>=0, Eve=0", scores(E));
   await all([A, B, C, D, E], p => vis(p, "write") && text(p, "barLabel") === "Round 3", 9000);
   game.RULES.NEXT_MS = 60000;
   check("the next round starts by itself after the pause", text(E, "barLabel") === "Round 3" && vis(E, "answerForm"));
@@ -325,13 +309,9 @@ try {
   check("after two quiet minutes any player can start without the missing one", text(B, "unstickW") === "Start without Eve", text(B, "unstickW"));
   click(B, "unstickW");
   await yes(B);
-  await all([A, B, C, D, E], p => vis(p, "read"));
-  game.RULES.STALL_MS = 120000;
-  check("round 3's reader is the third player", vis(C, "readMine"));
-  for (let i = 0; i < 3; i++) { await until(() => !el(C, "readNextBtn").disabled && text(C, "readCount1").startsWith(String(i + 1))); click(C, "readNextBtn"); }
-  await until(() => text(C, "readNextBtn") === "Start the guessing" && !el(C, "readNextBtn").disabled);
-  click(C, "readNextBtn");
   await all([A, B, C, D, E], p => vis(p, "guess") && answers(p).length === 4);
+  game.RULES.STALL_MS = 120000;
+  check("round 3 starts with the third player", text(C, "turnHead") === "Your turn, Cy", text(A, "turnHead"));
   await guess(C, "b3", "Bob");
   await all([A, C], p => /^Cy=5/.test(scores(p)));
   check("reaching the target mid-round does not stop the round", vis(A, "guess") && /^Cy=5/.test(scores(A)), scores(A));
@@ -348,7 +328,7 @@ try {
   await guess(C, "a3", "Ann");
   await all([A, B, C, E], p => vis(p, "over"));
   check("the winner is the first thing on the screen, worded for the winner too",
-    text(B, "winnerLine") === "Cy wins!" && text(C, "winnerLine") === "You win, Cy!" && text(B, "overLine") === "First to 5." && /^Cy=8, Ann=4/.test(scores(B)) && text(B, "barLabel") === "Game over",
+    text(B, "winnerLine") === "Cy wins!" && text(C, "winnerLine") === "You win, Cy!" && text(B, "overLine") === "First to 5." && /^Cy=8, Bob=3, Ann=1/.test(scores(B)) && text(B, "barLabel") === "Game over",
     text(B, "winnerLine") + " " + scores(B));
   check("the removed player's answer is shown as nobody's", texts(B, "#revealList li").some(x => x === "“d3”someone who left"), texts(B, "#revealList li").join("|"));
   await until(() => /won 1 of 1/.test(text(C, "myStats")) && /won 0 of 1/.test(text(A, "myStats")));
@@ -441,10 +421,6 @@ try {
   st = game.startRound(st, uid(A), { topic: "T", index: 0 }, Date.now());
   await sdk.setDoc(g2(A.h), st);
   for (const id of [uid(A), uid(B), anonUid]) st = game.submit(st, id, { text: "t " + id }, Date.now());
-  await sdk.setDoc(g2(A.h), st);
-  await denied("a point while the answers are still being read", sdk.updateDoc(g2(A.h) && g2(anon), { ["players." + anonUid + ".s"]: 1 }));
-  while (st.shown < st.shuffle.length) st = game.nextAnswer(st, st.reader, null, Date.now());
-  st = game.beginGuess(st, st.reader, null, Date.now());
   await sdk.setDoc(g2(A.h), st);
   check("the second game is in the guessing step with the host on turn", st.phase === "guess" && st.turn === uid(A));
   await denied("a point for a player whose turn it is not", sdk.updateDoc(g2(anon), { ["players." + anonUid + ".s"]: 1 }));
