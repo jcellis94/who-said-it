@@ -9,10 +9,10 @@
    answers appear on every phone at once and players take turns), done. A
    separate read step, where one player revealed the answers one by one, was
    built and removed on 2026-11-27 because it did not work in play.
-   There are no clocks during a round. A guesser may pass; the host may pass
-   anyone and may close the writing. If nothing has happened for STALL_MS,
-   every player may do what the host could, so a missing host cannot freeze
-   the game. The only clock is the pause before the next round starts itself.
+   There are no clocks. A guesser may pass; the host may pass anyone, may
+   close the writing, and starts every round. If nothing has happened for
+   STALL_MS during a round, every player may do the host's unsticking. If the
+   host is gone or in the way, the other players can vote for a new one.
 
    State is one document, games/{CODE}:
      host      uid of the Google user who created the game
@@ -29,34 +29,33 @@
      answers   { uid: text }   the page shows the text and hides the uid
      shuffle   uids of answers in the order they are read and shown
      found     { answer uid: uid of the player it was matched to }
-     reader    unused, always ""  } left over from the read step; kept so the
-     shown     unused, always 0   } security rules' field count stays the same
      turn      uid whose turn it is to guess
      misses    wrong guesses made this turn
      allowed   wrong guesses allowed per turn (grows as trips go by)
      trips     full trips of the turn around the table this round
      tripLeft  turns left in the current trip
-     deadline  ms time the next round starts by itself (0 during a round)
      since     ms time of the last thing that happened, for the safety net
      seq       goes up by one with every event, so phones show each one once
-     last      the latest event: { kind: guess | pass | left, by, answer, target, ok }
+     last      the latest event: { kind: guess | pass | left | host, by, answer, target, ok }
                  guess: by guessed that target wrote answer (an answer uid)
                  pass:  by's turn was passed by target (themselves, the host, anyone)
                  left:  the host removed a player; answer holds their name
+                 host:  the players voted; by is the new host, answer the old host's name
      log       this round's guesses, oldest first
      base      { uid: score when the round started }, for "this round" points
      note      "" | "few" (round void) | "tie" (target reached, top scores level)
                | "host" (the host ended the game early)
      winners   uids, once the phase is over
-     credited  Google uids whose saved win counts already include this game */
+     credited  Google uids whose saved win counts already include this game
+     votes     uids of players who have voted for a new host */
 
 /* The numbers the owner wants to play with. Change them here only. */
 export var RULES = {
-  NEXT_MS: 60000,       // pause before the next round starts by itself
   STALL_MS: 120000,     // quiet time before any player may do the host's unsticking
   TRIPS_PER_STEP: 2,    // trips around the table before everyone gets one more try
   MAX_MISSES: 3,        // most wrong guesses per turn
   BONUS: 2,             // points for the last one hiding
+  HOST_VOTES: 3,        // votes that replace the host (or every other player, if fewer)
   TARGETS: [5, 10, 15, 20],
   DEFAULT_TARGET: 10,
   MIN_PLAYERS: 2,
@@ -75,12 +74,6 @@ GameError.prototype = Object.create(Error.prototype);
 
 function fail(message) { throw new GameError(message); }
 
-/* The pause between rounds: a phone starting the next round for the clock
-   names the deadline it saw, so two phones cannot both start a round. */
-function clockRanOut(s, uid, args, now) {
-  return !!(args && args.clock) && !!s.players[uid] && s.deadline > 0 &&
-    args.deadline === s.deadline && now >= s.deadline;
-}
 /* The host, or any player once the game has been quiet for STALL_MS. */
 function hostOrStalled(s, uid, now, what) {
   if (uid === s.host) return;
@@ -129,10 +122,9 @@ export function newGame(hostUid, options) {
     pack: options.pack || "general",
     phase: "lobby", round: 0, topic: "", used: [],
     players: {}, inRound: [], alive: [], answers: {}, shuffle: [], found: {},
-    reader: "", shown: 0,
     turn: "", misses: 0, allowed: 1, trips: 0, tripLeft: 0,
-    deadline: 0, since: 0, seq: 0, last: null, log: [], base: {},
-    note: "", winners: [], credited: []
+    since: 0, seq: 0, last: null, log: [], base: {},
+    note: "", winners: [], credited: [], votes: []
   };
 }
 
@@ -172,11 +164,10 @@ function setTopic(s, args) {
   if (args.index >= 0 && s.used.indexOf(args.index) < 0) s.used.push(args.index);
 }
 
-/* The host, or any player's phone once the pause between rounds is over. */
+/* Only the host starts a round; nothing starts by itself. */
 export function startRound(s, uid, args, now) {
   if (s.phase !== "lobby" && s.phase !== "done") fail("A round is already being played.");
-  if (args && args.clock) { if (!clockRanOut(s, uid, args, now)) fail("The next round has already started."); }
-  else if (uid !== s.host) fail("Only the host can start the round.");
+  if (uid !== s.host) fail("Only the host can start the round.");
   if (Object.keys(s.players).length < RULES.MIN_PLAYERS) fail("At least " + RULES.MIN_PLAYERS + " players are needed.");
   s = clone(s);
   setTopic(s, args);
@@ -184,11 +175,10 @@ export function startRound(s, uid, args, now) {
   s.phase = "write";
   s.inRound = seats(s);
   s.alive = []; s.answers = {}; s.shuffle = []; s.found = {};
-  s.reader = ""; s.shown = 0;
   s.turn = ""; s.misses = 0; s.allowed = 1; s.trips = 0; s.tripLeft = 0;
   s.log = []; s.note = ""; s.base = {};
   s.inRound.forEach(function (id) { s.base[id] = s.players[id].s; });
-  s.deadline = 0; s.since = now;
+  s.since = now;
   happened(s, null);
   return s;
 }
@@ -214,11 +204,11 @@ function shuffled(list, rand) {
 
 function endRound(s, now) {
   s.phase = "done";
-  s.turn = ""; s.reader = ""; s.misses = 0;
-  s.deadline = now + RULES.NEXT_MS; s.since = now;
+  s.turn = ""; s.misses = 0;
+  s.since = now;
   var top = leaders(s);
   if (top.length && s.players[top[0]].s >= s.target) {
-    if (top.length === 1) { s.phase = "over"; s.winners = top; s.deadline = 0; }
+    if (top.length === 1) { s.phase = "over"; s.winners = top; }
     else s.note = "tie";
   }
 }
@@ -336,26 +326,64 @@ export function pass(s, uid, args, now) {
 
 /* ---------- host controls ---------- */
 
+/* Take a player out of the game, wherever the round is. */
+function takeOut(s, id, now, rand, quiet) {
+  var name = s.players[id].n;
+  delete s.players[id];
+  delete s.base[id];
+  s.inRound = s.inRound.filter(function (x) { return x !== id; });
+  s.winners = s.winners.filter(function (x) { return x !== id; });
+  s.votes = s.votes.filter(function (x) { return x !== id; });
+  if (s.phase === "write") {
+    delete s.answers[id];
+    if (s.inRound.length && s.inRound.every(function (x) { return s.answers[x] !== undefined; })) reveal(s, now, rand);
+  } else if (s.phase === "guess" && s.alive.indexOf(id) >= 0) {
+    /* Their answer stays on the list as a decoy nobody can match. */
+    if (!quiet) happened(s, { kind: "left", by: "", answer: name, target: "", ok: false });
+    if (s.turn === id) passTurn(s, now);
+    knockOut(s, id, now);
+  } else {
+    /* between rounds: every list of player ids must still name real players */
+    s.alive = s.alive.filter(function (x) { return x !== id; });
+  }
+  return name;
+}
+
 export function remove(s, uid, args, now, rand) {
   var id = args && args.player;
   if (uid !== s.host) fail("Only the host can take someone out.");
   if (id === s.host) fail("The host cannot be taken out.");
   if (!s.players[id]) fail("That player has already left.");
   s = clone(s);
-  var name = s.players[id].n;
-  delete s.players[id];
-  delete s.base[id];
-  s.inRound = s.inRound.filter(function (x) { return x !== id; });
-  s.winners = s.winners.filter(function (x) { return x !== id; });
-  if (s.phase === "write") {
-    delete s.answers[id];
-    if (s.inRound.length && s.inRound.every(function (x) { return s.answers[x] !== undefined; })) reveal(s, now, rand);
-  } else if (s.phase === "guess" && s.alive.indexOf(id) >= 0) {
-    /* Their answer stays on the list as a decoy nobody can match. */
-    happened(s, { kind: "left", by: "", answer: name, target: "", ok: false });
-    if (s.turn === id) passTurn(s, now);
-    knockOut(s, id, now);
+  takeOut(s, id, now, rand, false);
+  return s;
+}
+
+/* How many votes replace the host: HOST_VOTES, or every other player if
+   there are fewer than that. */
+export function votesNeeded(s) {
+  var others = Object.keys(s.players).filter(function (id) { return id !== s.host; }).length;
+  return Math.max(1, Math.min(RULES.HOST_VOTES, others));
+}
+
+/* A player votes for a new host, or takes the vote back. With enough votes
+   the host is taken out of the game and the longest-seated other player
+   becomes host. */
+export function voteHost(s, uid, args, now, rand) {
+  if (!s.players[uid]) fail("You are not in this game.");
+  if (uid === s.host) fail("You are the host.");
+  s = clone(s);
+  if (s.votes.indexOf(uid) >= 0) {
+    s.votes = s.votes.filter(function (x) { return x !== uid; });
+    return s;
   }
+  s.votes.push(uid);
+  if (s.votes.length < votesNeeded(s)) return s;
+  var old = s.host, oldName = s.players[old] ? s.players[old].n : "The host";
+  s.host = seats(s).filter(function (id) { return id !== old; })[0];
+  s.votes = [];
+  if (s.players[old]) takeOut(s, old, now, rand, true);
+  happened(s, { kind: "host", by: s.host, answer: oldName, target: "", ok: false });
   return s;
 }
 
@@ -363,7 +391,7 @@ export function finish(s, uid) {
   if (uid !== s.host) fail("Only the host can end the game.");
   if (s.phase === "lobby" || s.phase === "over") fail("There is no game to end.");
   s = clone(s);
-  s.phase = "over"; s.turn = ""; s.reader = ""; s.deadline = 0; s.note = "host";
+  s.phase = "over"; s.turn = ""; s.note = "host";
   s.winners = leaders(s);
   return s;
 }

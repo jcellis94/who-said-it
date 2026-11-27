@@ -99,7 +99,8 @@ async function all(phones, fn, ms) {
   return ok;
 }
 const mom = p => text(p, "momentHead") + text(p, "momentBody") + text(p, "momentMore");
-const moment = (p, re) => until(() => vis(p, "moment") && re.test(mom(p)));
+// the words stay in place after the three seconds are up, so a slow run still sees them
+const moment = (p, re) => until(() => re.test(mom(p)));
 
 try {
   // ================= the page, end to end =================
@@ -237,7 +238,7 @@ try {
     texts(B, "#gainList li").join("|") === "Ann (host)+1|Cy+4" && text(B, "leaderLine") === "Cy needs 1 more to win.", texts(B, "#gainList li").join("|") + " " + text(B, "leaderLine"));
   check("round end names every writer", texts(B, "#revealList li").sort().join("|") === "“<i>the dog</i>”Bob|“a sock”Dee <b>x</b>|“gravy”Cy|“naps”Ann", texts(B, "#revealList li").join("|"));
   check("only the host lines up the next topic and starts the round", vis(A, "nextBtn") && text(A, "nextBtn") === "Start round 2" && !vis(B, "nextBtn") && text(B, "doneWait") === "Waiting for Ann to start round 2.");
-  check("the next round will start by itself after a minute", /^Starts by itself in (5\d|60)\.$/.test(text(B, "autoLine")), text(B, "autoLine"));
+  check("the next round waits for the host; a player who is waiting can vote for a new one", !/by itself/.test(el(B, "done").textContent) && vis(B, "voteDone") && text(B, "voteDone") === "Ann not here? Vote for a new host" && !vis(A, "voteDone"), text(B, "voteDone"));
 
   // ----- round 2: start without stragglers, hand the reading on, pass, the safety nets -----
   const lined = text(A, "nextTopic");
@@ -285,13 +286,14 @@ try {
   await all([B, C], p => p === B ? text(B, "turnHead") === "Your turn, Bob" : text(p, "turnHead") === "Bob is guessing");
   check("the skip is credited to whoever pressed it, not blamed on a clock", /Cy moved things along\./.test(mom(B)) && !/time/i.test(mom(B)), mom(B));
 
-  game.RULES.NEXT_MS = 1500;
   await guess(B, "ann two", "Ann");
   check("round 2 ends", await all([A, B, C, D, E], p => vis(p, "done")));
   check("scores carry on across rounds", scores(E) === "Cy=4, Bob=3, Ann=1, Dee <b>x</b>=0, Eve=0", scores(E));
-  await all([A, B, C, D, E], p => vis(p, "write") && text(p, "barLabel") === "Round 3", 9000);
-  game.RULES.NEXT_MS = 60000;
-  check("the next round starts by itself after the pause", text(E, "barLabel") === "Round 3" && vis(E, "answerForm"));
+  await wait(1200);
+  check("nothing starts by itself", [A, B, C, D, E].every(p => vis(p, "done")));
+  await until(() => !el(A, "nextBtn").disabled);
+  click(A, "nextBtn");
+  await all([A, B, C, D, E], p => vis(p, "write") && text(p, "barLabel") === "Round 3");
 
   // ----- round 3: change the topic, the write safety net, taking someone out, winning -----
   await answer(B, "early");
@@ -348,6 +350,27 @@ try {
   click(E, "askNo");
   check("'Stay' stays", vis(E, "lobby"));
 
+  // ----- the players vote for a new host -----
+  click(B, "menuBtn");
+  check("players, not the host, are offered the vote", vis(B, "mVote") && text(B, "mVote") === "Vote for a new host" && !vis(A, "mVote"));
+  click(B, "mVote");
+  await until(() => vis(B, "askVeil"));
+  check("the vote says what it does and who would take over", text(B, "askText") === "Vote for a new host? It takes 3 votes. Ann would be taken out of the game and you would become host." && text(B, "askYes") === "Vote", text(B, "askText"));
+  await yes(B);
+  await all([A, B, C], p => /1 of 3/.test(p === A ? text(A, "voteLine") : text(p, "mVote")));
+  check("everyone can see the count, and a voter can take the vote back",
+    text(A, "voteLine") === "1 of 3 votes for a new host." && text(B, "mVote") === "Take back my vote for a new host (1 of 3)" && text(C, "voteLobby") === "Ann not here? Vote for a new host (1 of 3)", text(C, "voteLobby"));
+  click(C, "voteLobby"); await yes(C);
+  await until(() => /2 of 3/.test(text(E, "mVote")));
+  check("two votes are not enough", vis(A, "hostSetup") && !vis(B, "hostSetup"));
+  click(E, "menuBtn"); click(E, "mVote"); await yes(E);
+  await all([B, C, E], p => p === B ? vis(B, "hostSetup") : text(p, "lobbyWait") === "Waiting for Bob to start.");
+  check("the third vote makes the longest-waiting player the host", vis(B, "hostSetup") && vis(B, "startGameBtn") && texts(C, "#lobbyList .pname").join("|") === "Bob (host)|Cy (you)|Eve", texts(C, "#lobbyList .pname").join("|"));
+  check("everyone is told", await moment(C, /Bob is the host now\.The players voted\. Ann is out of the game\./) && await moment(B, /You're the host now\./), mom(C) + " | " + mom(B));
+  await until(() => vis(A, "removed"));
+  check("the old host is out and told why", vis(A, "removed") && text(A, "removedLine") === "The players voted for a new host. If that was a mistake, hop back in.", text(A, "removedLine"));
+  check("the vote starts again from nothing", text(C, "mVote") === "Vote for a new host");
+
   // a reload keeps the seat
   const B2 = new JSDOM(html, { runScripts: "dangerously", url: "https://host.example/#" + code,
     beforeParse(w) { w.WSI_DEPS = { backend: B.h.be, game, topics }; } });
@@ -379,7 +402,10 @@ try {
   await allowed("taking one's own seat", sdk.updateDoc(gameRef(anon), { ["players." + anonUid]: seat }));
 
   // now a player in the game
-  await denied("a player changing the host", sdk.updateDoc(gameRef(anon), { host: anonUid }));
+  await denied("a player making themselves host without the votes", sdk.updateDoc(gameRef(anon), { host: anonUid }));
+  await denied("a player stuffing the vote and taking over in one write", sdk.updateDoc(gameRef(anon), { host: anonUid, votes: [] }));
+  await denied("casting someone else's vote", sdk.updateDoc(gameRef(anon), { votes: [uid(C)] }));
+  await denied("a 21-entry vote list", sdk.updateDoc(gameRef(anon), { votes: Array.from({ length: 21 }, (_, i) => "v" + i) }));
   await denied("a player changing the creation time", sdk.updateDoc(gameRef(anon), { created: sdk.serverTimestamp() }));
   await denied("a player deleting the game", sdk.deleteDoc(gameRef(anon)));
   await denied("a player adding an unknown field", sdk.updateDoc(gameRef(anon), { extra: 1 }));
@@ -392,7 +418,6 @@ try {
   await denied("a negative score", sdk.updateDoc(gameRef(anon), { ["players." + anonUid + ".s"]: -1 }));
   await denied("a 21st player", sdk.updateDoc(gameRef(anon), Object.fromEntries(Array.from({ length: 17 }, (_, i) => ["players.fake" + i, seat]))));
   await denied("more misses than the game allows", sdk.updateDoc(gameRef(anon), { misses: 4 }));
-  await denied("a text deadline", sdk.updateDoc(gameRef(anon), { deadline: "soon" }));
   await denied("a player changing another player's score", sdk.updateDoc(gameRef(anon), { ["players." + uid(B) + ".s"]: 3 }));
   await denied("a player removing another player", sdk.updateDoc(gameRef(anon), { ["players." + uid(B)]: sdk.deleteField() }));
   await denied("a player giving up their own seat entry", sdk.updateDoc(gameRef(anon), { ["players." + anonUid]: sdk.deleteField() }));
@@ -404,8 +429,6 @@ try {
   await denied("an event with an extra field", sdk.updateDoc(gameRef(anon), { last: { kind: "guess", by: "a", answer: "b", target: "c", ok: true, html: "<b>" } }));
   await denied("an event with a number for a name", sdk.updateDoc(gameRef(anon), { last: { kind: "guess", by: 1, answer: "b", target: "c", ok: true } }));
   await denied("an event of an unknown kind", sdk.updateDoc(gameRef(anon), { last: { kind: "boom", by: "a", answer: "b", target: "c", ok: true } }));
-  await denied("a reader who is not in the round", sdk.updateDoc(gameRef(anon), { reader: anonUid }));
-  await denied("more answers shown than exist", sdk.updateDoc(gameRef(anon), { shown: 3 }));
   await denied("a text for the last-activity time", sdk.updateDoc(gameRef(anon), { since: "now" }));
   await denied("a 41-entry guess list", sdk.updateDoc(gameRef(anon), { log: Array.from({ length: 41 }, () => 1) }));
   await allowed("a player renaming their own character", sdk.updateDoc(gameRef(anon), { ["players." + anonUid + ".n"]: "Mal" }));

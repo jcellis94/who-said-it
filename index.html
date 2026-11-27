@@ -193,6 +193,7 @@
       <div id="lobbyGuest" hidden>
         <h1 id="youreIn"></h1>
         <p class="soft" id="lobbyWait"></p>
+        <button id="voteLobby" class="quiet" type="button" hidden></button>
       </div>
       <h2 id="lobbyCount"></h2>
       <ul id="lobbyList"></ul>
@@ -290,7 +291,7 @@
         <button class="main" id="nextBtn" type="button"></button>
       </div>
       <p id="doneWait" class="soft" hidden></p>
-      <p id="autoLine" class="soft small"></p>
+      <button id="voteDone" class="quiet" type="button" hidden></button>
       <div id="gainBox">
         <h2>This round</h2>
         <ul id="gainList" class="people"></ul>
@@ -319,6 +320,8 @@
           <button id="hRemove" type="button">Take someone out</button>
           <button id="hEnd" type="button" hidden>End the game</button>
         </div>
+        <p id="voteLine" class="soft small" style="margin:0;text-align:center" hidden></p>
+        <button id="mVote" type="button" hidden></button>
         <button id="mLeave" type="button">Leave the game</button>
         <button id="mClose" class="quiet" type="button">Close</button>
       </div>
@@ -436,7 +439,6 @@ window.startWhoSaidIt = function (deps) {
   var nextPick = null;    // host: the topic lined up for the next round
   var auto = { key: "", at: 0 };   // last move this phone made by itself
   var credited = "";      // game already added to saved wins
-  var jitter = 900 + Math.floor(Math.random() * 900);
   var toastTimer = 0, momentTimer = 0, wake = null;
   var coached = {};       // round-1 hints already shown
   var sound = true;
@@ -604,6 +606,8 @@ window.startWhoSaidIt = function (deps) {
         more.unshift(up);
         if (L.target === L.by) moment("", L.by === uid ? "You passed." : name(L.by) + " passed.", "", more.filter(Boolean).join(" "));
         else moment("", name(L.target) + " moved things along.", "", more.filter(Boolean).join(" "));
+      } else if (L.kind === "host") {
+        moment("", L.by === uid ? "You're the host now." : name(L.by) + " is the host now.", "The players voted. " + L.answer + " is out of the game.", "");
       } else if (L.kind === "left") {
         moment("", L.answer + " left the game.", ended ? "" : "Their answer stays as a decoy.", "");
       }
@@ -631,7 +635,7 @@ window.startWhoSaidIt = function (deps) {
   $("signOutBtn").onclick = function () { leave(); be.signOut(); };
 
   /* ---------- joining and starting ---------- */
-  function usable(g) { return !!g && typeof g.seq === "number"; }   // games from before this version are over
+  function usable(g) { return !!g && typeof g.seq === "number" && Array.isArray(g.votes); }   // games from before this version are over
   function open(c) {
     $("homeMsg").textContent = "";
     return be.signInGuest().then(function () { return be.getGame(c); }).then(function (g) {
@@ -811,6 +815,17 @@ window.startWhoSaidIt = function (deps) {
     show("menuVeil", false);
     ask("Leave the game? You can come back with the same code on this phone.", "Leave", "Stay").then(function (yes) { if (yes) leave(); });
   };
+  /* Any player but the host: vote for a new host, or take the vote back. */
+  function voteNew() {
+    show("menuVeil", false);
+    if (s.votes.indexOf(me.uid) >= 0) { quietly(act("voteHost")); return; }
+    var need = G.votesNeeded(s), heir = G.seats(s).filter(function (id) { return id !== s.host; })[0];
+    ask("Vote for a new host? It takes " + need + (need === 1 ? " vote. " : " votes. ") + name(s.host) + " would be taken out of the game and " +
+      (heir === me.uid ? "you" : name(heir)) + " would become host.", "Vote", "Never mind").then(function (yes) {
+      if (yes) quietly(act("voteHost"));
+    });
+  }
+  $("mVote").onclick = voteNew; $("voteDone").onclick = voteNew; $("voteLobby").onclick = voteNew;
   $("hSkip").onclick = function () { show("menuVeil", false); quietly(act("pass")); };
   $("hGo").onclick = function () { show("menuVeil", false); startWithout(); };
   $("hTopic").onclick = function () { panel("menuTopic"); };
@@ -835,19 +850,9 @@ window.startWhoSaidIt = function (deps) {
   }
   function tick() {
     if (!s || !me) return;
-    if (s.phase === "done" && s.deadline) {
-      var left = s.deadline - Date.now(), secs = Math.max(0, Math.ceil(left / 1000));
-      $("autoLine").textContent = "Starts by itself in " + secs + ".";
-    } else $("autoLine").textContent = "";
     if (!amIn() || sending) return;
-    /* the phone it concerns moves first; the others a moment later in case that phone is gone */
-    var lag = isHost() ? 250 : jitter;
     if (s.phase === "write" && s.inRound.length && !missing().length) {
       once("allin" + s.round, 4000, function () { return act("allIn", null, true); });
-    } else if (s.phase === "done" && s.deadline && Date.now() - s.deadline >= lag) {
-      once("next" + s.round + ":" + s.deadline, 4000, function () {
-        return act("startRound", Object.assign({ clock: true, deadline: s.deadline }, isHost() && nextPick ? nextPick : freshTopic()), true);
-      });
     }
     /* the safety-net buttons appear without anything else changing */
     if ((s.phase === "write" || s.phase === "guess") && stalled() !== tick.wasStalled) { tick.wasStalled = stalled(); render(); }
@@ -1044,7 +1049,20 @@ window.startWhoSaidIt = function (deps) {
     }
   }
 
+  function drawVote() {
+    var can = amIn() && !isHost(), mine = s.votes.indexOf(me.uid) >= 0, n = s.votes.length, need = G.votesNeeded(s);
+    var count = n ? " (" + n + " of " + need + ")" : "";
+    var label = mine ? "Take back my vote for a new host" + count : "Vote for a new host" + count;
+    show("mVote", can); $("mVote").textContent = label;
+    show("voteLine", !can && n > 0);
+    $("voteLine").textContent = n + " of " + need + " votes for a new host.";
+    var nudge = mine ? label : name(s.host) + " not here? " + label;
+    show("voteDone", can && s.phase === "done"); $("voteDone").textContent = nudge;
+    show("voteLobby", can && s.phase === "lobby"); $("voteLobby").textContent = nudge;
+  }
+
   function drawMenu() {
+    drawVote();
     $("mSound").textContent = "Sound and buzz: " + (sound ? "on" : "off");
     $("inviteCode").textContent = code;
     $("inviteHow").textContent = "Scan this, or type " + code + " at " + location.host + ".";
@@ -1099,7 +1117,11 @@ window.startWhoSaidIt = function (deps) {
     show("over", joined && p === "over");
     show("done", joined && (p === "done" || p === "over"));
     if (p !== "guess") show("pickVeil", false);
-    if (out) { $("removedLine").textContent = name(s.host) + " took you out. If that was a mistake, hop back in."; closeSheets(); return; }
+    if (out) {
+      var voted = s.last && s.last.kind === "host";
+      $("removedLine").textContent = (voted ? "The players voted for a new host." : name(s.host) + " took you out.") + " If that was a mistake, hop back in.";
+      closeSheets(); return;
+    }
     if (!joined) {
       show("midRound", p !== "lobby" && p !== "over");
       show("nameSignIn", !me.google);
@@ -1142,7 +1164,7 @@ if (!window.WSI_DEPS) {
   const cdn = "https://www.gstatic.com/firebasejs/13.4.0/";
   /* Change this whenever game.js, backend.js or topics.js changes, so a phone
      never runs a new page with an old copy of them. */
-  const version = "?v=5";
+  const version = "?v=6";
   try {
     const [app, auth, store, backend, game, topics] = await Promise.all([
       import(cdn + "firebase-app.js"),

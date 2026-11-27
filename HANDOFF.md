@@ -6,7 +6,8 @@ this whole file before acting.
 
 ## State on 2026-11-27
 
-**Version 2 is live** at https://who-said-it-8eeaa.web.app,
+**Version 2 is live; check `git log` against the site for what is deployed.**
+The site is at https://who-said-it-8eeaa.web.app,
 deployed from branch `claude/bold-allen-05u2q8` (rules, then hosting) with the
 owner's go-ahead. Checked on the live site as a guest: the page loads with no
 errors and an unknown code reads "Can't find game". No real game has been
@@ -64,9 +65,7 @@ not objected to).
   should just flag the screen flash saying it's time to start guessing and
   show all options as if the reading step had already happened". Reading
   aloud itself still got laughs in their earlier test; it was the in-app step
-  that failed. Do not rebuild it without asking. The state fields `reader`
-  and `shown` are left over, always empty, so the security rules' field count
-  did not have to change.
+  that failed. Do not rebuild it without asking. Its state fields were removed with the round clock.
 - Guess: players take turns. Tap an answer, tap a name, then "That's my
   guess" under the words "Say it out loud!". Right: one point and another
   guess. Wrong: the turn moves to the next player in join order. A caught
@@ -87,9 +86,16 @@ not objected to).
 - First to a target score wins; the host picks 5, 10, 15 or 20, default 10.
   Checked at the end of a round; level top scores play another round. Scores
   carry across rounds. (said / chose)
-- The next round starts by itself 60 seconds after a round ends; the host
-  normally starts it sooner and can swap or write the next topic first.
-  (chose)
+- Only the host starts a round; nothing starts by itself. The host can swap
+  or write the next topic first. (said: "It shouldn't start after a timer, it
+  should wait for the host." This replaced an earlier choice of a 60-second
+  auto-start.)
+- The players can vote for a new host: 3 votes, or every other player if
+  there are fewer than 3 of them. The old host is taken out of the game (and
+  can rejoin as a player); the longest-seated other player becomes host. A
+  vote can be taken back. (said: "You should allow the collective to kick the
+  host after 3+ votes"; the fewer-than-3 rule, who takes over, and taking the
+  vote back are mine.)
 - The host can take a player out at any time; mid-round their answer stays on
   the list as a decoy. (chose)
 - A late joiner plays from the next round. (chose)
@@ -172,9 +178,12 @@ How writes work, and why:
   seconds before this change). After sending an answer the phone asks for
   `allIn`, which starts the guessing if nobody is missing. The
   rules refuse answer changes outside the write step.
-- A phone that starts the next round for the clock names the deadline it saw;
-  `game.js` refuses the move if that has changed, so two phones cannot both
-  start a round. The host's phone goes first, the others about a
+- The only thing a phone does by itself is ask for `allIn` when it sees every
+  answer is in. There are no deadlines in the state.
+- The security rules compare lists of player ids against the players map
+  (`inRound`, `alive`, `winners`). Any move that removes a player must clean
+  every such list, in every phase, or the write is refused. Taking a player
+  out between rounds was refused for this reason until `takeOut` was fixed. The host's phone goes first, the others about a
   second later. Phones use their own clocks.
 - Every event (guess, pass, player taken out) bumps `seq` and is stored in
   `last`; a phone shows the result moment when it sees `seq` change.
@@ -188,10 +197,11 @@ How writes work, and why:
   result of its own write. Keep that: the result can be older than what the
   listener already delivered.
 - **The security rules have a hard limit of 1,000 evaluated expressions per
-  request**, and one 30-field document uses most of it. A non-host player's
+  request**, and one 28-field document uses most of it. A non-host player's
   guess is the most expensive path. Version 2 first hit the limit (every
   guest's guess was refused in the emulator) and the validator was rewritten
-  to be cheap; the margin is now roughly 45 extra simple comparisons. Before
+  to be cheap; the margin is at least 45 extra simple comparisons (measured again after the
+  host vote was added). Before
   adding a field or a check, measure: pad the rule with N copies of
   `after.round >= 0`, play a guest's guess in the emulator, and see where it
   starts failing. Production may count slightly differently from the emulator.
@@ -200,15 +210,14 @@ How writes work, and why:
 
 `npm install && npm test` (needs Java for the emulator):
 
-- `test/game.test.mjs`: 23 tests of the rules on their own.
+- `test/game.test.mjs`: 28 tests of the rules on their own.
 - `test/backend.test.mjs`: 3 tests of sign-in on reload, against a stand-in SDK.
 - `test/phones.mjs`: five simulated phones run the real page and real SDK
   against the Auth and Firestore emulators with the real rules: three rounds
   covering the time-to-guess flash, the guess panel, a bluff with your own
   answer, result moments, passing, both safety
   nets, a changed topic, taking a player out, winning, saved wins and play
-  again; then about 70 direct attacks on the rules. 156 checks, ending
-  `all passed`.
+  again; then about 70 direct attacks on the rules. the vote for a new host. 163 checks, ending `all passed`.
 
 Also done once by hand for version 2: a round played in real phone-sized
 Chromium (real module loading, light and dark) against the emulators, with no

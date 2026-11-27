@@ -29,7 +29,8 @@ rules_version = '2';
 // What these security rules enforce:
 //   - only someone signed in who has the code reads a game; no listing
 //   - only a Google user creates a game, empty, as its host
-//   - host and creation time never change; games are never deleted
+//   - the creation time never changes and games are never deleted; the
+//     host changes only when enough players have voted for a new one
 //   - exact field list, types, sizes and cross-references on every write
 //   - someone not in the game may only take their own seat, at 0 points
 //   - a player who is not the host may change only their own seat and
@@ -177,7 +178,7 @@ service cloud.firestore {
     // ===============================================================
 
     // Security Rules stop evaluating a request after 1,000 expressions, and
-    // this document has 30 fields, so the checks below are written to be
+    // this document has 28 fields, so the checks below are written to be
     // cheap. `test/phones.mjs` plays whole games through them; if a rule is
     // added here, run it and keep the margin.
     //
@@ -186,7 +187,7 @@ service cloud.firestore {
     // are not re-checked here: create pins them to the signed-in user and the
     // server time, and update requires them unchanged.
     function isValidGame(data) {
-      return data.size() == 30 &&
+      return data.size() == 28 &&
         data.target in [5, 10, 15, 20] &&
         data.pack is string && data.pack.size() <= 20 &&
         data.phase in ['lobby', 'write', 'read', 'guess', 'done', 'over'] &&
@@ -200,14 +201,11 @@ service cloud.firestore {
         data.answers is map && data.answers.size() <= 20 &&
         data.shuffle is list && data.shuffle.size() <= 20 && data.shuffle.hasOnly(data.answers.keys()) &&
         data.found is map && data.found.size() <= 20 &&
-        (data.reader == '' || data.reader in data.alive) &&
-        data.shown is int && data.shown <= data.shuffle.size() &&
         (data.turn == '' || data.turn in data.alive) &&
         data.misses in [0, 1, 2, 3] &&
         data.allowed in [1, 2, 3] &&
         data.trips is int &&
         data.tripLeft is int &&
-        data.deadline is number &&
         data.since is number &&
         data.seq is int &&
         isValidLast(data.last) &&
@@ -215,15 +213,16 @@ service cloud.firestore {
         data.base is map && data.base.size() <= 20 &&
         data.note is string && data.note.size() <= 10 &&
         data.winners is list && data.winners.size() <= 20 &&
-        data.credited is list && data.credited.size() <= 20;
+        data.credited is list && data.credited.size() <= 20 &&
+        data.votes is list && data.votes.size() <= 20;
     }
 
-    // The latest event (a guess, a pass, a player taken out), shown once
+    // The latest event (a guess, a pass, a player taken out, a new host), shown once
     // on every phone.
     function isValidLast(last) {
       return last == null ||
         (last is map && last.size() == 5 &&
-         last.kind in ['guess', 'pass', 'left'] &&
+         last.kind in ['guess', 'pass', 'left', 'host'] &&
          last.by is string && last.by.size() <= 128 &&
          last.answer is string && last.answer.size() <= 128 &&
          last.target is string && last.target.size() <= 128 &&
@@ -269,11 +268,29 @@ service cloud.firestore {
       let gain = uid in after.players ? after.players[uid].s - before.players[uid].s : 0;
       return after.target == before.target &&
         after.pack == before.pack &&
+        // a vote for a new host: only your own, added or taken back
+        after.votes.removeAll([uid]) == before.votes.removeAll([uid]) &&
         after.players.diff(before.players).affectedKeys().hasOnly([uid]) &&
         uid in after.players &&
         answers.addedKeys().hasOnly([uid]) &&
         answers.changedKeys().hasOnly([uid]) &&
         (gain == 0 || (gain in [1, 3] && before.phase == 'guess' && before.turn == uid));
+    }
+
+    // The players vote for a new host (game.js voteHost). The write that
+    // casts the deciding vote hands the game to another player and takes
+    // the old host out: it needs three votes counting this one, or every
+    // other player's if there are fewer than three of them.
+    function isHostVotedOut() {
+      let uid = request.auth.uid;
+      let before = resource.data;
+      let after = request.resource.data;
+      return uid in before.players &&
+        uid != before.host &&
+        !(uid in before.votes) &&
+        (before.votes.size() >= 2 || before.votes.size() + 2 >= before.players.size()) &&
+        after.host in after.players &&
+        after.votes.size() == 0;
     }
 
     function mayPlay() {
@@ -315,10 +332,11 @@ service cloud.firestore {
       allow update: if isAuthenticated() &&
         isValidGame(request.resource.data) &&
         ownEntriesValid(request.resource.data) &&
-        request.resource.data.host == resource.data.host &&
         request.resource.data.created == resource.data.created &&
         answersOpen() &&
-        (mayPlay() || isTakingSeat());
+        (request.resource.data.host == resource.data.host
+          ? (mayPlay() || isTakingSeat())
+          : isHostVotedOut());
 
       allow delete: if false;
     }
