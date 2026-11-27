@@ -6,20 +6,28 @@ this whole file before acting.
 
 ## State on 2026-11-27
 
-**Built and tested in the emulator, not deployed.** The redesign the owner asked
-for is on branch `claude/bold-allen-05u2q8`. The live site
-(https://who-said-it-8eeaa.web.app) still serves the earlier prototype, and the
-live Firestore rules are still the prototype's.
+**Live.** The redesign is deployed at https://who-said-it-8eeaa.web.app
+(rules first, then hosting, both from branch `claude/bold-allen-05u2q8`, with
+the owner's go-ahead and a one-session Firebase CLI login).
 
-**To go live (needs the owner's go-ahead and a Firebase CLI login; never ask
-for credentials in chat):**
+Checked on the live site as a guest, in a phone-sized browser: the page loads
+the Firebase SDK from Google's CDN with no errors, a guest is signed in
+anonymously, and an unknown code reads as "No game has the code".
 
-1. `npx firebase deploy --only firestore:rules` first. The new rules file
-   still contains the prototype's `rooms` block unchanged, so the old page
-   keeps working after this step.
-2. `npx firebase deploy --only hosting`. From here phones get the new page.
-3. Play one real game on two phones (see "Not tested" below).
-4. Later, delete the `rooms` block from `firestore.rules` and redeploy rules.
+Next:
+
+1. The owner plays one real game on two phones. Google sign-in on a real
+   phone and a full round against the real project have not been tested.
+2. Later, delete the prototype's `rooms` block from `firestore.rules` and
+   redeploy the rules. It is unchanged and harmless until then.
+3. Anonymous test accounts from the probes (three from the prototype, one from
+   this deploy check) can be deleted in Authentication > Users.
+
+To deploy again: `npx firebase login --no-localhost` prints a link and a
+session ID; the owner opens the link, checks the ID, signs in, and pastes back
+a one-time code; then `npx firebase login <code>`, and
+`npx firebase deploy --only firestore:rules` before `--only hosting`. The
+cloud environment `who-said-it` already allows the hosts this needs.
 
 ## The game, as agreed with the owner
 
@@ -143,19 +151,18 @@ Also done once by hand in this session: a round played in real phone-sized
 Chromium (real module loading, light and dark) against the emulators, with no
 page errors and no sideways scrolling.
 
-Not tested anywhere: the new page against the real Firebase project; the real
-Google sign-in popup on a phone; the SDK loading from `www.gstatic.com` (the
-cloud container blocks that host; the files were served locally); more than
-five phones; phones with bad connections or wrong clocks.
+Not tested anywhere: a game played on the real Firebase project; the real
+Google sign-in popup on a phone; more than five phones; phones with bad
+connections or wrong clocks.
 
 The security rules follow Firebase's `firestore-rules-creation` skill
 (validators shared by create and update, strict field lists, size limits,
 immutable host and creation time, its attack checklist run as emulator tests).
 The skill is not installed in cloud sessions; it was read from a clone of the
 public repository `firebase/agent-skills` (`skills/firestore-rules-creation/
-SKILL.md`). Do the same if the plugin is missing. Still to do, and it needs
-the Firebase login: `npx firebase deploy --only firestore:rules --dry-run`.
-The rules are a prototype: review them before sharing the game widely.
+SKILL.md`). Do the same if the plugin is missing. Firebase's compiler
+accepted them (`deploy --only firestore:rules --dry-run`) before they were
+published. The rules are a prototype: review them before sharing the game widely.
 
 ## Limits to know about
 
@@ -163,8 +170,6 @@ The rules are a prototype: review them before sharing the game widely.
 - A removed player's phone returns to the character screen and can rejoin.
 - A guest who signs in with Google after taking a seat gets a new seat; sign
   in first. The page only offers Google sign-in on the home screen.
-- Leftover from the prototype: three anonymous test accounts in
-  Authentication > Users can be deleted.
 
 ## How to work with the owner
 
