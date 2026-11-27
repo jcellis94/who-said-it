@@ -297,9 +297,42 @@ try {
   await denied("a 21st player", sdk.updateDoc(gameRef(anon), Object.fromEntries(Array.from({ length: 17 }, (_, i) => ["players.fake" + i, seat]))));
   await denied("more misses than the game allows", sdk.updateDoc(gameRef(anon), { misses: 4 }));
   await denied("a text deadline", sdk.updateDoc(gameRef(anon), { deadline: "soon" }));
+  await denied("a player changing another player's score", sdk.updateDoc(gameRef(anon), { ["players." + uid(B) + ".s"]: 3 }));
+  await denied("a player removing another player", sdk.updateDoc(gameRef(anon), { ["players." + uid(B)]: sdk.deleteField() }));
+  await denied("a player giving up their own seat entry", sdk.updateDoc(gameRef(anon), { ["players." + anonUid]: sdk.deleteField() }));
+  await denied("a player giving themselves a point when it is not their turn", sdk.updateDoc(gameRef(anon), { ["players." + anonUid + ".s"]: 1 }));
+  await denied("a player changing the target score", sdk.updateDoc(gameRef(anon), { target: 20 }));
+  await denied("a player changing the topic pack", sdk.updateDoc(gameRef(anon), { pack: "christmas" }));
+  await denied("a turn held by someone not in the round", sdk.updateDoc(gameRef(anon), { turn: anonUid }));
+  await denied("a round list naming someone who is not a player", sdk.updateDoc(gameRef(anon), { inRound: ["ghost"] }));
+  await denied("a winner who is not a player", sdk.updateDoc(gameRef(anon), { winners: ["ghost"] }));
+  await denied("a text among the used topic numbers", sdk.updateDoc(gameRef(anon), { used: ["x"] }));
+  await denied("a last-guess banner with an extra field", sdk.updateDoc(gameRef(anon), { last: { by: "a", answer: "b", target: "c", ok: true, skip: false, html: "<b>" } }));
+  await denied("a last-guess banner with a number for a name", sdk.updateDoc(gameRef(anon), { last: { by: 1, answer: "b", target: "c", ok: true, skip: false } }));
+  await denied("a deadline years away", sdk.updateDoc(gameRef(anon), { deadline: Date.now() + 365 * 86400000 }));
+  await allowed("a player renaming their own character", sdk.updateDoc(gameRef(anon), { ["players." + anonUid + ".n"]: "Mal" }));
+
+  // points only on your own turn: a second game, in the guessing step
+  const G2 = "TURN22", g2 = h => sdk.doc(h.db, "games", G2);
+  await sdk.setDoc(g2(A.h), fresh(uid(A)));
+  await sdk.updateDoc(g2(A.h), { ["players." + uid(A)]: { n: "Ann", s: 0, j: 1 } });
+  await sdk.updateDoc(g2(B.h), { ["players." + uid(B)]: { n: "Bob", s: 0, j: 2 } });
+  await sdk.updateDoc(g2(anon), { ["players." + anonUid]: { n: "Mal", s: 0, j: 3 } });
+  let st = (await sdk.getDoc(g2(A.h))).data();
+  st = game.startRound(st, uid(A), { topic: "T", index: 0 }, Date.now());
+  await sdk.setDoc(g2(A.h), st);
+  for (const id of [uid(A), uid(B), anonUid]) st = game.submit(st, id, { text: "t " + id }, Date.now());
+  await sdk.setDoc(g2(A.h), st);
+  check("the second game is in the guessing step with the host on turn", st.phase === "guess" && st.turn === uid(A));
+  await denied("a point for a player whose turn it is not", sdk.updateDoc(g2(anon), { ["players." + anonUid + ".s"]: 1 }));
+  await sdk.updateDoc(g2(A.h), { turn: anonUid });
+  await denied("two points at once on your own turn", sdk.updateDoc(g2(anon), { ["players." + anonUid + ".s"]: 2 }));
+  await denied("ten points at once on your own turn", sdk.updateDoc(g2(anon), { ["players." + anonUid + ".s"]: 10 }));
+  await denied("writing someone else's answer", sdk.updateDoc(g2(anon), { ["answers." + uid(B)]: "swapped" }));
+  await allowed("one point on your own turn", sdk.updateDoc(g2(anon), { ["players." + anonUid + ".s"]: 1 }));
   // The accepted limit, stated as a check so nobody mistakes it for protection:
-  await allowed("KNOWN LIMIT, accepted by the owner: a player who edits the code can change another player's score",
-    sdk.updateDoc(gameRef(anon), { ["players." + uid(B) + ".s"]: 3 }));
+  await allowed("KNOWN LIMIT, accepted by the owner: on their own turn a player who edits the code can take a point without a right guess",
+    sdk.updateDoc(g2(anon), { ["players." + anonUid + ".s"]: 2 }));
 
   const mal = backend("mallory"); await mal.be.signInGoogle();
   const malUid = mal.auth.currentUser.uid;

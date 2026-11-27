@@ -73,10 +73,12 @@ to win? I don't care forget it". So the simple design was built:
   until everyone has sent one.
 - The data does contain it. `answers` is keyed by the writer's id, and every
   phone in the game receives the whole game document. A player who opens
-  developer tools can read who wrote what, and can also write scores or turns
-  directly, because the security rules check who may write and the shape of
-  the data, not the rules of play. The emulator test states this as a check
-  labelled "KNOWN LIMIT".
+  developer tools can read who wrote what.
+- The security rules stop a player from changing anyone else's seat, score or
+  answer, the target, or the pack, and from scoring outside their own turn.
+  They do not check that a claimed guess was right or whose turn comes next,
+  so on their own turn such a player could take a point they did not earn.
+  The emulator test states this as a check labelled "KNOWN LIMIT".
 - If that ever matters, the stronger design is: answer texts in a document
   nobody can read until reveal, one author record per player readable only by
   that player, and a two-step guess (lock the guess in publicly, then record
@@ -134,9 +136,8 @@ How writes work, and why:
 - `test/game.test.mjs`: 23 tests of the rules on their own.
 - `test/phones.mjs`: five simulated phones run the real page and real SDK
   against the Auth and Firestore emulators with the real rules: three rounds
-  including the timers, removal, winning, saved wins and play again; then 50
-  direct attacks on the rules. 103 checks, ending `all passed`. It ran clean
-  eight times in a row.
+  including the timers, removal, winning, saved wins and play again; then 70
+  direct attacks on the rules. 123 checks, ending `all passed`.
 
 Also done once by hand in this session: a round played in real phone-sized
 Chromium (real module loading, light and dark) against the emulators, with no
@@ -147,9 +148,14 @@ Google sign-in popup on a phone; the SDK loading from `www.gstatic.com` (the
 cloud container blocks that host; the files were served locally); more than
 five phones; phones with bad connections or wrong clocks.
 
-The security rules were written by hand. The brief asked for the
-`firebase:firestore-rules-creation` skill; it was not available in the
-session that wrote them. Have them reviewed with that skill when it is.
+The security rules follow Firebase's `firestore-rules-creation` skill
+(validators shared by create and update, strict field lists, size limits,
+immutable host and creation time, its attack checklist run as emulator tests).
+The skill is not installed in cloud sessions; it was read from a clone of the
+public repository `firebase/agent-skills` (`skills/firestore-rules-creation/
+SKILL.md`). Do the same if the plugin is missing. Still to do, and it needs
+the Firebase login: `npx firebase deploy --only firestore:rules --dry-run`.
+The rules are a prototype: review them before sharing the game widely.
 
 ## Limits to know about
 
