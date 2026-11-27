@@ -6,13 +6,17 @@ this whole file before acting.
 
 ## State on 2026-11-27
 
-**Version 2 is live** at https://who-said-it-8eeaa.web.app (page version 7 at the time of writing; the
-branch is at 8 after a code review:
-`window.WSI_VERSION` in `index.html`). The owner and their brother have
-played it on real phones and reported "Seems fine." To see whether the site
-matches the repository, compare the served files with the checkout, for
-example `curl -s https://who-said-it-8eeaa.web.app/game.js | sha1sum`.
+**Version 2 is live** at https://who-said-it-8eeaa.web.app, page version 8
+(`window.WSI_VERSION` in `index.html`), published from `main` after pull
+request #1 and three rounds of code review. The owner and family have played
+version 7 on real phones; version 8 (the review fixes) has not been played on
+the real site. To see whether the site matches the repository, compare the
+served files with the checkout, for example
+`curl -s https://who-said-it-8eeaa.web.app/game.js | sha1sum`.
 Deploys need the owner's explicit "publish" each time, rules before hosting.
+
+**Next piece of work: two versions of the game.** See "Two versions" below.
+Nothing of it is built.
 
 How version 2 came about: the owner played version 1 on real phones ("It all
 works!"), then had a designer agent review the flow. The review is not in the
@@ -123,6 +127,55 @@ option); varying the "Things…" opening of the topics; showing real name and
 silly name together.
 
 All the numbers above are in one place: `RULES` at the top of `game.js`.
+
+## Two versions (direction set by the owner on 2026-11-27, not built)
+
+After playing a lot with family, the owner decided the game should exist in
+two versions. Their reasoning, close to their words: when everything happens
+on phones, the talk between people is lost; "even one of the players, my dad,
+just ended up using his phone the whole time." The very first rough draft (a
+Claude artifact, before this repository) "was so rudimentary. It was the most
+fun."
+
+**Remote version: what is built now.** For people who are not in the same
+room. "Explicitly not meant to be played in person", though it can be.
+
+**In-person version: to be designed and built.** What the owner said:
+
+- One person's phone is the reader's. It shows all the submitted answers.
+- The reader checks answers off as they are guessed and players off as they
+  are caught. That let the reader "keep track of who was in without asking
+  people", and see what had and had not been guessed.
+- Everyone else uses their phone for one thing only: typing their answer.
+  That replaces finding paper, tearing it and writing. "Everything else, they
+  don't need their phone for."
+- It is "very stripped down" on purpose. Part of the fun is the table working
+  it out: who said what, how many guesses there are. The reader decides how
+  many times to read the answers out. People forgetting is part of it, and a
+  good memory is an advantage, so the players' phones should NOT show the
+  answers, the guesses so far, or who is caught.
+- "That's pretty much all that it tracks."
+
+Open, in the owner's words "we need to play with that and design it":
+
+- How the reader role moves between rounds: hand the physical phone on, or
+  each player's own phone can become the reader's.
+
+Not said, to ask before building (do not assume):
+
+- Whether the in-person version keeps score at all. The first draft had
+  +1 / +2 buttons per player; the owner's summary of what it tracks did not
+  mention score.
+- Whether the reader's phone shows who wrote each answer. In the paper game
+  the reader does not know; the accused player says so out loud.
+- How a host chooses which version a game is, and what each is called on
+  screen.
+- Whether the reader also plays and guesses, as in the paper game.
+
+Reuse from the remote version: sign-in, codes and joining, names, topic packs,
+sending an answer from your own phone, the host tools. The turn order, the
+guess panel, the result moments, "second chances" and the "So far" list belong
+to the remote version only.
 
 ## Secrecy: what the owner decided
 
