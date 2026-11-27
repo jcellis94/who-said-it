@@ -160,7 +160,9 @@ test("first reader rotates each round", () => {
 test("guessing: right scores a point, catches the writer and keeps the turn", () => {
   let s = guessing(["Ann", "Bob", "Cy", "Dee"]);
   says(() => G.guess(s, "bob", { answer: "cy", target: "cy" }, 1), /not your turn/);
-  says(() => G.guess(s, "h", { answer: "h", target: "bob" }, 1), /yours/);
+  const bluff = G.guess(s, "h", { answer: "h", target: "bob" }, 1);
+  assert.equal(bluff.last.ok, false, "naming someone for your own answer is a legal bluff, and wrong");
+  assert.equal(bluff.turn, "bob"); assert.deepEqual(bluff.alive, s.alive); assert.equal(bluff.found.h, undefined);
   says(() => G.guess(s, "h", { answer: "bob", target: "h" }, 1), /someone else/);
   const seq = s.seq;
   s = G.guess(s, "h", { answer: "cy", target: "cy" }, 3000);

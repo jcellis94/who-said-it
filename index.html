@@ -986,7 +986,6 @@ window.startWhoSaidIt = function (deps) {
         if (a === uid) b.appendChild(make("span", "tag", "yours"));
         b.onclick = function () {
           if (s.turn !== uid) { toast("Hang on, it's " + name(s.turn) + "'s turn."); return; }
-          if (a === uid) { toast("That one's yours. Pick another."); return; }
           if (sending) return;
           picked = a; target = ""; render();
         };

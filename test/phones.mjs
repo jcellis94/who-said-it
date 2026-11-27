@@ -222,6 +222,7 @@ try {
   check("the matched answer names its writer and who caught them", answers(C).find(b => own(b) === "<i>the dog</i>").querySelector(".tag").textContent === "Bob, caught by Ann");
   check("a right guess keeps the turn", text(A, "turnHead") === "Your turn, Ann");
 
+  check("your own answer is marked for you and can still be picked, to bluff", !answers(A).find(b => own(b) === "naps").disabled && answers(A).find(b => own(b) === "naps").querySelector(".tag").textContent === "yours");
   await guess(A, "gravy", "Dee <b>x</b>");
   await Promise.all([moment(A, /Nope\./), moment(D, /Safe!/), moment(B, /Nope!/)]);
   check("a wrong guess is a moment too, and says who is up",

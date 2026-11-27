@@ -343,7 +343,7 @@ export function guess(s, uid, args, now) {
   if (s.turn !== uid) fail("It is not your turn.");
   var answer = args && args.answer, target = args && args.target;
   if (s.shuffle.indexOf(answer) < 0 || s.found[answer]) fail("That answer is not in play.");
-  if (answer === uid) fail("That one's yours. Pick another.");
+  /* Naming someone for your own answer is allowed: a bluff that costs a try. */
   if (target === uid) fail("Guess someone else.");
   if (s.alive.indexOf(target) < 0) fail("That player is already caught.");
   s = clone(s);

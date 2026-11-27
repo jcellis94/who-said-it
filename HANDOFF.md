@@ -63,6 +63,9 @@ not objected to).
   guess. Wrong: the turn moves to the next player in join order. A caught
   player is out of the guessing for the round. The last one hiding scores 2
   extra. (said / chose)
+- You may name someone for your own answer, to throw people off; it is a
+  wrong guess. (said: "You should be able to guess someone for your own
+  answer to throw people")
 - No turn clock. The guesser can pass; the host can pass anyone's turn and can
   start the reading without players who have not answered. (said)
 - Quiet safety net: if nothing has happened for 2 minutes, every player gets
@@ -88,7 +91,7 @@ not objected to).
 - Words: hide and seek. Caught, still hiding, last one hiding, second
   chances. The screens do not say character, seat, trip or sit out. (chose)
 - Mine: the host also plays; at most 20 players; two identical answers count
-  for either writer; you cannot pick your own answer; the host can end the
+  for either writer; the host can end the
   game early; "Play again" keeps players and zeroes scores; every guess shows
   a three-second result on every phone, worded for the guesser, the person
   named and everyone else; a "So far" list keeps the last five guesses;
